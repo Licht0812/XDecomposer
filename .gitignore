@@ -1,0 +1,20 @@
+checkpoints/
+logs/
+__pycache__/
+*.out
+.ipynb_checkpoints/
+Xrd_exp/
+test_results_*/
+test_results_film_*/
+*.png
+*.log
+*.db
+# Ignored directories and files
+archive_deprecated/
+checkpoints/
+data/
+scripts/python_runners/find_50_perfect.py
+scripts/python_runners/find_perfect_weight_id_20.py
+swanlog/
+test_results/
+test_results_rruff_perfect_weight_id_20/
