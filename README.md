@@ -1,7 +1,7 @@
 # XRDUnmix
 
 ## 📖 Project Overview
-XRDUnmix is a deep learning-based framework for the separation and phase identification of multiphase X-ray Diffraction (XRD) patterns. The project aims to utilize neural networks (e.g., Masked Autoencoders (MAE) for feature pre-training, combined with a multi-channel/hybrid separation model) to decode and separate complex mixed-phase XRD patterns into independent reference phase patterns, thereby accomplishing component analysis and subsequent crystal matching.
+XRDUnmix is a deep learning-based framework for the separation and phase identification of multiphase X-ray Diffraction (XRD) patterns. 
 
 ## 📂 Project Structure
 To maintain a clean engineering structure, all execution-level logic has been decoupled. The overall project architecture is as follows:
@@ -16,6 +16,10 @@ To maintain a clean engineering structure, all execution-level logic has been de
 - `src/`: Core deep learning source code (network model definitions, network architecture, data loaders, and general utility functions).
 - `checkpoints/`: Stores archived model weights during the training process (if generated).
 - `data/`: Stores locally dependent database files (e.g., `rruff.db`).
+
+## 💾 Pre-trained Models & Data
+The model weights and the RRUFF dataset are available on Google Drive. Please download and extract them into your local `XRDUnmix` directory:
+- [Click here to download from Google Drive](https://drive.google.com/drive/folders/1bdgzdtouRn7TObqmvMgNLdA5PGPx0dVt?usp=sharing)
 
 ## ⚙️ Configuration (Environment & Paths)
 The project uses a "single source of truth" configuration managed entirely in **`configs/paths.sh`**. You can say goodbye to scattered hard-coded variables and maintain all paths in one place.
@@ -65,14 +69,4 @@ Because environment variables are unified, all testing scripts can be launched w
   ```bash
   bash scripts/bash_test/run_rruff_k_test.sh
   ```
-
-### 3. Search & Utilities
-- **Grid Search**
-  If you need to find the optimal golden parameters for mathematical thresholds in the post-processing classification logic (e.g., `alpha`, `margin`, `hard_threshold`):
-  ```bash
-  bash scripts/bash_search/run_grid_search.sh
-  ```
-  *(The generated matrix exploration logs will be automatically categorized as CSV/log files within the corresponding directory)*
-
 ---
-*Note: Runtime logs and execution scripts have been standardized into English to ensure cross-platform compatibility and parsing format safety.*
