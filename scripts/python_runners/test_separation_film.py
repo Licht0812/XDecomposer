@@ -52,8 +52,9 @@ def build_reference_bank(dataset, device):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
     
+    dataset_name = "rruff" if hasattr(dataset, 'phases') else "mp20"
     split_name = getattr(dataset, 'split', 'test')
-    cache_path = os.path.join(save_dir, f"{split_name}_ref_bank_cache.pt")
+    cache_path = os.path.join(save_dir, f"{dataset_name}_{split_name}_ref_bank_cache.pt")
     
     if os.path.exists(cache_path):
         print(f"Fast loading cached Reference Bank from {cache_path}...")
@@ -61,36 +62,48 @@ def build_reference_bank(dataset, device):
         dataset._cached_ref_bank = ref_data
         return ref_data[0], ref_data[1]
 
-    print("Building Reference Bank for Identification...")
+    print(f"Building Reference Bank for Identification ({dataset_name})...")
     ref_patterns = []
     ref_ids = []
-    
-    # We use the dataset's base dataset logic to load patterns
-    # The OnlineMixingXRDDataset has a .indices attribute containing valid IDs for this split
-    valid_ids = dataset.indices
-    
-    # Use the underlying get_crystal_patterns method
-    # We need to access the base XRDBaseDataset method, which is available on dataset instance
-    
     count = 0
-    for cid in tqdm(valid_ids, desc="Loading Refs"):
-        # Load 1 sample per ID (canonical pattern)
-        patterns = dataset.get_crystal_patterns(int(cid), max_samples=1)
-        if not patterns:
-            continue
+    
+    if dataset_name == "rruff":
+        # RRUFF dataset parsing from .phases directly
+        for s_id, rruff_id, intensities in tqdm(dataset.phases, desc="Loading Refs (RRUFF)"):
+            tensor = torch.tensor(intensities, dtype=torch.float32)
+            if getattr(tensor, 'max')() > 0:
+                tensor = tensor / tensor.max()
+            ref_patterns.append(tensor)
+            ref_ids.append(int(s_id))
+            count += 1
             
-        # Process: Pad/Crop/Normalize
-        # Note: We must match the normalization used in training/testing (usually Max scaling)
-        # OnlineMixingDataset does Max scaling per sample.
-        # Here we process the single reference similarly.
+    else:
+        # MP20 dataset parsing
+        # The OnlineMixingXRDDataset has a .indices attribute containing valid IDs for this split
+        valid_ids = dataset.indices
         
-        # Use process_pattern from core.py
-        # norm_method="max" ensures peak is at 1.0, consistent with model output range roughly
-        tensor = process_pattern(patterns[0], dataset.xrd_length, norm_method="max")
+        # Use the underlying get_crystal_patterns method
+        # We need to access the base XRDBaseDataset method, which is available on dataset instance
         
-        ref_patterns.append(tensor)
-        ref_ids.append(int(cid))
-        count += 1
+        count = 0
+        for cid in tqdm(valid_ids, desc="Loading Refs"):
+            # Load 1 sample per ID (canonical pattern)
+            patterns = dataset.get_crystal_patterns(int(cid), max_samples=1)
+            if not patterns:
+                continue
+                
+            # Process: Pad/Crop/Normalize
+            # Note: We must match the normalization used in training/testing (usually Max scaling)
+            # OnlineMixingDataset does Max scaling per sample.
+            # Here we process the single reference similarly.
+            
+            # Use process_pattern from core.py
+            # norm_method="max" ensures peak is at 1.0, consistent with model output range roughly
+            tensor = process_pattern(patterns[0], dataset.xrd_length, norm_method="max")
+            
+            ref_patterns.append(tensor)
+            ref_ids.append(int(cid))
+            count += 1
         
     if count == 0:
         print("Warning: No reference patterns loaded!")
