@@ -1,0 +1,90 @@
+
+#(C) 2022 by FIZ Karlsruhe - Leibniz Institute for Information Infrastructure.  All rights reserved.
+data_257493-ICSD
+_database_code_ICSD 257493
+_audit_creation_date 2018-02-01
+_chemical_name_common 'Bismuth iron oxide'
+_chemical_formula_structural 'Bi25 Fe O39'
+_chemical_formula_sum 'Bi25 Fe1 O39'
+_chemical_name_structure_type Sillenite#Bi12SiO20
+_exptl_crystal_density_diffrn 9.26
+_citation_title
+'Synthesis of Bi25FeO39 by molten salts method and its Moessbauer spectrum'
+loop_
+_citation_id
+_citation_journal_full
+_citation_year
+_citation_journal_volume
+_citation_page_first
+_citation_page_last
+_citation_journal_id_ASTM
+primary 'Physica B: Condensed Matter (Amsterdam, Netherlands)' 2017 504 109 111
+PHYBE3
+loop_
+_citation_author_citation_id
+_citation_author_name
+primary 'Flores Morales, Shirley Sarai'
+primary 'Leon Flores, Jesus A.'
+primary 'Perez Mazariego, Jose Luis'
+primary 'Marquina Fabrega, Vivianne'
+primary 'Gomez Gonzalez, Raul W.'
+_cell_length_a 10.191(6)
+_cell_length_b 10.191(6)
+_cell_length_c 10.191(6)
+_cell_angle_alpha 90.
+_cell_angle_beta 90.
+_cell_angle_gamma 90.
+_cell_volume 1058.4
+_cell_formula_units_Z 1
+_space_group_name_H-M_alt 'I 2 3'
+_space_group_IT_number 197
+loop_
+_space_group_symop_id
+_space_group_symop_operation_xyz
+1 '-z, -x, y'
+2 '-y, -z, x'
+3 '-x, -y, z'
+4 '-z, x, -y'
+5 '-y, z, -x'
+6 '-x, y, -z'
+7 'z, -x, -y'
+8 'y, -z, -x'
+9 'x, -y, -z'
+10 'z, x, y'
+11 'y, z, x'
+12 'x, y, z'
+13 '-z+1/2, -x+1/2, y+1/2'
+14 '-y+1/2, -z+1/2, x+1/2'
+15 '-x+1/2, -y+1/2, z+1/2'
+16 '-z+1/2, x+1/2, -y+1/2'
+17 '-y+1/2, z+1/2, -x+1/2'
+18 '-x+1/2, y+1/2, -z+1/2'
+19 'z+1/2, -x+1/2, -y+1/2'
+20 'y+1/2, -z+1/2, -x+1/2'
+21 'x+1/2, -y+1/2, -z+1/2'
+22 'z+1/2, x+1/2, y+1/2'
+23 'y+1/2, z+1/2, x+1/2'
+24 'x+1/2, y+1/2, z+1/2'
+loop_
+_atom_type_symbol
+_atom_type_oxidation_number
+Bi3+ 3
+Fe3+ 3
+O2- -2
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_symmetry_multiplicity
+_atom_site_Wyckoff_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_B_iso_or_equiv
+_atom_site_occupancy
+Bi1 Bi3+ 24 f 0.175(2) 0.318(1) 0.013(3) . 1.
+Bi2 Bi3+ 2 a 0. 0. 0. . 0.5
+Fe1 Fe3+ 2 a 0. 0. 0. . 0.5
+O1 O2- 8 c 0.689(6) 0.689(6) 0.689(6) . 1.
+O2 O2- 24 f 0.652(3) 0.780(9) 0.973(4) . 1.
+O3 O2- 8 c 0.885(4) 0.885(4) 0.885(4) . 0.875
+#End of TTdata_257493-ICSD

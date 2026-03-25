@@ -1,0 +1,79 @@
+
+#(C) 2022 by FIZ Karlsruhe - Leibniz Institute for Information Infrastructure.  All rights reserved.
+data_15299-ICSD
+_database_code_ICSD 15299
+_audit_creation_date 1980-01-01
+_audit_update_record 2007-08-01
+_chemical_name_common 'Bismuth iron(III) oxide'
+_chemical_formula_structural 'Bi Fe O3'
+_chemical_formula_sum 'Bi1 Fe1 O3'
+_chemical_name_structure_type LiNbO3
+_exptl_crystal_density_diffrn 8.31
+_citation_title 'Ferroelectric Bi Fe O3 X-Ray and neutron diffraction study'
+loop_
+_citation_id
+_citation_journal_full
+_citation_year
+_citation_journal_volume
+_citation_page_first
+_citation_page_last
+_citation_journal_id_ASTM
+primary 'Journal of Physics and Chemistry of Solids' 1971 32 1315 1320 JPCSAW
+loop_
+_citation_author_citation_id
+_citation_author_name
+primary 'Moreau, J.M.'
+primary 'Michel, C.'
+primary 'Gerson, R.'
+primary 'James, W.J.'
+_cell_length_a 5.5876(3)
+_cell_length_b 5.5876(3)
+_cell_length_c 13.867(1)
+_cell_angle_alpha 90.
+_cell_angle_beta 90.
+_cell_angle_gamma 120.
+_cell_volume 374.94
+_cell_formula_units_Z 6
+_space_group_name_H-M_alt 'R 3 c H'
+_space_group_IT_number 161
+loop_
+_space_group_symop_id
+_space_group_symop_operation_xyz
+1 '-x+y, y, z+1/2'
+2 'x, x-y, z+1/2'
+3 '-y, -x, z+1/2'
+4 '-x+y, -x, z'
+5 '-y, x-y, z'
+6 'x, y, z'
+7 '-x+y+2/3, y+1/3, z+5/6'
+8 'x+2/3, x-y+1/3, z+5/6'
+9 '-y+2/3, -x+1/3, z+5/6'
+10 '-x+y+2/3, -x+1/3, z+1/3'
+11 '-y+2/3, x-y+1/3, z+1/3'
+12 'x+2/3, y+1/3, z+1/3'
+13 '-x+y+1/3, y+2/3, z+1/6'
+14 'x+1/3, x-y+2/3, z+1/6'
+15 '-y+1/3, -x+2/3, z+1/6'
+16 '-x+y+1/3, -x+2/3, z+2/3'
+17 '-y+1/3, x-y+2/3, z+2/3'
+18 'x+1/3, y+2/3, z+2/3'
+loop_
+_atom_type_symbol
+_atom_type_oxidation_number
+Bi3+ 3
+Fe3+ 3
+O2- -2
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_symmetry_multiplicity
+_atom_site_Wyckoff_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_B_iso_or_equiv
+_atom_site_occupancy
+Bi1 Bi3+ 6 a 0 0 0 0.5 1.
+Fe1 Fe3+ 6 a 0 0 0.2212(15) 0.8 1.
+O1 O2- 18 b 0.443(2) 0.012(4) 0.9543(20) . 1.
+#End of TTdata_15299-ICSD
