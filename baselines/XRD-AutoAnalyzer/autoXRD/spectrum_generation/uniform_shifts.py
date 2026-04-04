@@ -71,7 +71,7 @@ class ShiftGen(object):
 
         intensities = self.intensities
 
-        steps = np.linspace(self.min_angle, self.max_angle, 4501)
+        steps = np.linspace(self.min_angle, self.max_angle, 3500)
 
         signals = np.zeros([len(angles), steps.shape[0]])
 
@@ -83,7 +83,7 @@ class ShiftGen(object):
         # Convolute every row with unique kernel
         # Iterate over rows; not vectorizable, changing kernel for every row
         domain_size = 20.0
-        step_size = (self.max_angle - self.min_angle)/4501
+        step_size = (self.max_angle - self.min_angle)/3500
         for i in range(signals.shape[0]):
             row = signals[i,:]
             ang = steps[np.argmax(row)]
@@ -101,7 +101,7 @@ class ShiftGen(object):
         else:
             norm_signal = signal
 
-        noise = np.random.normal(0, 0.25, 4501)
+        noise = np.random.normal(0, 0.25, 3500)
         noisy_signal = norm_signal + noise
 
         # Formatted for CNN

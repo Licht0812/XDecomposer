@@ -147,7 +147,7 @@ def calc_std_dev(two_theta, tau):
 
 def remap_pattern(angles, intensities):
 
-    steps = np.linspace(10, 100, 4501)
+    steps = np.linspace(10, 100, 3500)
     signals = np.zeros([len(angles), steps.shape[0]])
 
     for i, ang in enumerate(angles):
@@ -155,7 +155,7 @@ def remap_pattern(angles, intensities):
         idx = np.argmin(np.abs(ang-steps))
         signals[i,idx] = intensities[i]
     domain_size = 25.0
-    step_size = (100-10)/4501
+    step_size = (100-10)/3500
     for i in range(signals.shape[0]):
         row = signals[i,:]
         ang = steps[np.argmax(row)]
@@ -287,9 +287,9 @@ def get_reduced_pattern(y1, y2, last_normalization=1.0):
         else:
             warped_spectrum[ind2] = 0.0
 
-    # Now, upsample spectra back to their original size (4501)
-    warped_spectrum = resample(warped_spectrum, 4501)
-    orig_y = resample(orig_y, 4501)
+    # Now, upsample spectra back to their original size (3500)
+    warped_spectrum = resample(warped_spectrum, 3500)
+    orig_y = resample(orig_y, 3500)
 
     # Scale warped spectrum so y-values match measured spectrum
     scaled_spectrum, scaling_constant = scale_spectrum(warped_spectrum, orig_y)

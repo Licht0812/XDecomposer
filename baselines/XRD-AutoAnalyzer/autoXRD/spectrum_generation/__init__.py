@@ -88,7 +88,7 @@ class SpectraGenerator(object):
             for i, result in enumerate(pool.imap(self.augment, filenames), 1):
                 # result is (patterns, filename)
                 # patterns is a list of augmented spectra (e.g. 1 or 5 spectra)
-                # each spectrum is a list/array of 4501 values
+                # each spectrum is a list/array of 3500 values
                 
                 # Convert to float32 immediately to save 50% memory vs float64
                 patterns = np.array(result[0], dtype=np.float32)
@@ -112,7 +112,7 @@ class SpectraGenerator(object):
 
     def XRDtoPDF(self, xrd, min_angle, max_angle):
 
-        thetas = np.linspace(min_angle/2.0, max_angle/2.0, 4501)
+        thetas = np.linspace(min_angle/2.0, max_angle/2.0, 3500)
         Q = np.array([4*math.pi*math.sin(math.radians(theta))/1.5406 for theta in thetas])
         S = np.array(xrd).flatten()
 
@@ -121,7 +121,7 @@ class SpectraGenerator(object):
         integrand = Q * S * np.sin(Q * R[:, np.newaxis])
 
         pdf = (2*np.trapz(integrand, Q) / math.pi)
-        pdf = list(signal.resample(pdf, 4501))
+        pdf = list(signal.resample(pdf, 3500))
 
         return pdf
 

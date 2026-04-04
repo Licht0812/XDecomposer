@@ -43,7 +43,7 @@ class MixedGen(object):
                 self.saved_patterns = self.clean_specs
             else:
                 # For large datasets, use a zero signal for impurity to avoid O(N^2)
-                self.saved_patterns = [np.zeros(4501)]
+                self.saved_patterns = [np.zeros(3500)]
 
     @property
     def clean_specs(self):
@@ -56,7 +56,7 @@ class MixedGen(object):
             angles = pattern.x
             intensities = pattern.y
 
-            steps = np.linspace(self.min_angle, self.max_angle, 4501)
+            steps = np.linspace(self.min_angle, self.max_angle, 3500)
             signals = np.zeros([len(angles), steps.shape[0]])
 
             for i, ang in enumerate(angles):
@@ -67,7 +67,7 @@ class MixedGen(object):
             # Convolute every row with unique kernel
             # Iterate over rows; not vectorizable, changing kernel for every row
             domain_size = 25.0
-            step_size = (self.max_angle - self.min_angle)/4501
+            step_size = (self.max_angle - self.min_angle)/3500
             for i in range(signals.shape[0]):
                 row = signals[i,:]
                 ang = steps[np.argmax(row)]
@@ -91,7 +91,7 @@ class MixedGen(object):
     @property
     def impurity_spectrum(self):
         if not self.saved_patterns:
-             return np.zeros(4501)
+             return np.zeros(3500)
         signal = random.choice(self.saved_patterns)
         return signal
 
@@ -293,7 +293,7 @@ class MixedGen(object):
         shift = random.choice(shift_range)
         angles = np.array(angles) + shift
 
-        steps = np.linspace(self.min_angle, self.max_angle, 4501)
+        steps = np.linspace(self.min_angle, self.max_angle, 3500)
 
         signals = np.zeros([len(angles), steps.shape[0]])
 
@@ -305,7 +305,7 @@ class MixedGen(object):
         # Convolute every row with unique kernel
         # Iterate over rows; not vectorizable, changing kernel for every row
         domain_size = random.choice(self.possible_domains)
-        step_size = (self.max_angle - self.min_angle)/4501
+        step_size = (self.max_angle - self.min_angle)/3500
         for i in range(signals.shape[0]):
             row = signals[i,:]
             ang = steps[np.argmax(row)]
@@ -334,7 +334,7 @@ class MixedGen(object):
         else:
             norm_signal = signal
 
-        noise = np.random.normal(0, 0.25, 4501)
+        noise = np.random.normal(0, 0.25, 3500)
         noisy_signal = norm_signal + noise
 
         # Formatted for CNN

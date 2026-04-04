@@ -78,28 +78,57 @@ class SpectrumAnalyzer(object):
 
     @property
     def reference_phases(self):
-        # Ignore hidden files that sometimes appear (like .DS_Store on Mac)
-        return [fname for fname in sorted(os.listdir(self.ref_dir)) if fname[0] != '.']
+        if os.path.exists('class_list.pkl'):
+            import pickle
+            with open('class_list.pkl', 'rb') as f:
+                return pickle.load(f)
+        # Only include .cif files and ignore hidden files
+        return [fname for fname in sorted(os.listdir(self.ref_dir)) if fname.endswith('.cif') and fname[0] != '.']
 
     @property
     def suspected_mixtures(self):
-        """
-        Returns:
-            prediction_list: a list of all enumerated mixtures
-            confidence_list: a list of probabilities associated with the above mixtures
-        """
-
         spectrum = self.formatted_spectrum
+        self.model = tf.keras.models.load_model(self.model_path, compile=False)
+        if not hasattr(self, "fingerprints"):
+            import numpy as np
+            self.fingerprints = np.load("reference_fingerprints_full.npy")
+            self.ref_names = self.reference_phases
+        prediction_list, confidence_list, scale_list, spec_list = self.reconstruction_enumerate(spectrum)
+        return prediction_list, confidence_list, [], scale_list, spec_list
 
-        with custom_object_scope({'CustomDropout': CustomDropout}):
-            self.model = tf.keras.models.load_model(self.model_path, compile=False)
-
-        self.kdp = KerasDropoutPrediction(self.model)
-
-        prediction_list, confidence_list, backup_list, scale_list, spec_list = self.enumerate_routes(spectrum)
-
-        return prediction_list, confidence_list, backup_list, scale_list, spec_list
-
+    def reconstruction_enumerate(self, spectrum):
+        import torch
+        import torch.nn.functional as F
+        import numpy as np
+        current_spectrum = np.array(spectrum)
+        mixtures = []
+        confidences = []
+        scalings = []
+        spectra = []
+        sim_threshold = self.min_conf
+        if sim_threshold > 1.0: sim_threshold /= 100.0
+        for _ in range(self.max_phases):
+            x_input = current_spectrum.reshape(1, 3500, 1)
+            if np.max(x_input) > 0:
+                x_input = 100.0 * (x_input - np.min(x_input)) / (np.max(x_input) - np.min(x_input) + 1e-8)
+            pred_pattern = self.model.predict(x_input, verbose=0)[0]
+            t_pred = torch.from_numpy(pred_pattern).view(1, -1)
+            t_refs = torch.from_numpy(self.fingerprints)
+            sims = F.cosine_similarity(t_pred, t_refs)
+            best_idx = torch.argmax(sims).item()
+            best_id = self.ref_names[best_idx]
+            conf = sims[best_idx].item()
+            if conf < sim_threshold: break
+            scale = np.dot(current_spectrum, pred_pattern) / (np.dot(pred_pattern, pred_pattern) + 1e-8)
+            scale = max(0, scale)
+            mixtures.append(best_id)
+            confidences.append(conf * 100.0)
+            scalings.append(scale)
+            spectra.append(pred_pattern)
+            current_spectrum = current_spectrum - scale * pred_pattern
+            current_spectrum = np.maximum(current_spectrum, 0)
+            if np.max(current_spectrum) < self.cutoff: break
+        return [mixtures], [confidences], [scalings], [spectra]
     def convert_angle(self, angle):
         """
         Convert two-theta into Cu K-alpha radiation.
@@ -127,7 +156,7 @@ class SpectrumAnalyzer(object):
         Args:
             spectrum_name: filename of the spectrum that is being considered
         Returns:
-            ys: Processed XRD spectrum in 4501x1 form.
+            ys: Processed XRD spectrum in 3500x1 form.
         """
 
         ## Load data
@@ -165,7 +194,7 @@ class SpectrumAnalyzer(object):
 
         ## Fit to 4,501 values as to be compatible with CNN
         f = ip.CubicSpline(x, y)
-        xs = np.linspace(self.min_angle, self.max_angle, 4501)
+        xs = np.linspace(self.min_angle, self.max_angle, 3500)
         ys = f(xs)
 
         ## Smooth out noise
@@ -255,10 +284,9 @@ class SpectrumAnalyzer(object):
             prediction, num_phases, certanties, num_outputs = self.kdp.predict(xrd_spectrum, self.min_conf)
 
         assert num_outputs == len(self.reference_phases), \
-            """The number of files in the References folder does not
-            match the number of outputs in the CNN. Please ensure
-            you have not added or removed any of the CIFs in
-            your References folder since training the model."""
+            f"""The number of outputs in the CNN ({num_outputs}) does not
+            match the number of CIF files in the References folder ({len(self.reference_phases)}). 
+            Please ensure you are using the correct reference folder for this model."""
 
         # If no phases are suspected
         if num_phases == 0:
@@ -400,7 +428,7 @@ class SpectrumAnalyzer(object):
                 the for new_normalization constant.
         """
 
-        x_obs = xs = np.linspace(self.min_angle, self.max_angle, 4501)
+        x_obs = xs = np.linspace(self.min_angle, self.max_angle, 3500)
         y_obs = np.array(orig_y)
 
         # Ensure temp directory exists (multi-process safe)
@@ -506,7 +534,7 @@ class SpectrumAnalyzer(object):
         angles = pattern.x
         intensities = pattern.y
 
-        steps = np.linspace(self.min_angle, self.max_angle, 4501)
+        steps = np.linspace(self.min_angle, self.max_angle, 3500)
 
         signals = np.zeros([len(angles), steps.shape[0]])
 
@@ -518,7 +546,7 @@ class SpectrumAnalyzer(object):
         # Convolute every row with unique kernel
         # Iterate over rows; not vectorizable, changing kernel for every row
         domain_size = 25.0
-        step_size = (self.max_angle - self.min_angle)/4501
+        step_size = (self.max_angle - self.min_angle)/3500
         for i in range(signals.shape[0]):
             row = signals[i,:]
             ang = steps[np.argmax(row)]
@@ -593,7 +621,7 @@ class SpectrumAnalyzer(object):
 
     def XRDtoPDF(self, xrd, min_angle, max_angle):
 
-        thetas = np.linspace(min_angle/2.0, max_angle/2.0, 4501)
+        thetas = np.linspace(min_angle/2.0, max_angle/2.0, 3500)
         Q = np.array([4*math.pi*math.sin(math.radians(theta))/1.5406 for theta in thetas])
         S = np.array(xrd).flatten()
 
@@ -602,7 +630,7 @@ class SpectrumAnalyzer(object):
         integrand = Q * S * np.sin(Q * R[:, np.newaxis])
 
         pdf = (2*np.trapz(integrand, Q) / math.pi)
-        pdf = list(signal.resample(pdf, 4501))
+        pdf = list(signal.resample(pdf, 3500))
 
         return pdf
 
@@ -637,7 +665,7 @@ class KerasDropoutPrediction(object):
             min_conf /= 100.0
 
         # Format input
-        x = np.array([x])
+        x = np.array([x]); x = np.expand_dims(x, axis=-1)
 
         # Monte Carlo Dropout
         result = []

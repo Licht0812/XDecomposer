@@ -38,6 +38,20 @@ def calculate_rwp(pred_pattern: torch.Tensor, target_pattern: torch.Tensor, epsi
     denominator = torch.sum(target_pattern ** 2, dim=-1) + epsilon
     return torch.sqrt(numerator / denominator).mean().item()
 
+def calculate_quantitative_metrics(pred_patterns: torch.Tensor, target_patterns: torch.Tensor) -> float:
+    """Calculate Quantitative Mean Absolute Error (Quant MAE) in percentage points."""
+    if pred_patterns.dim() == 2:
+        pred_patterns = pred_patterns.unsqueeze(0)
+        target_patterns = target_patterns.unsqueeze(0)
+    pred_intensities = torch.sum(torch.clamp(pred_patterns, min=0), dim=-1)
+    target_intensities = torch.sum(target_patterns, dim=-1)
+    
+    pred_pct = pred_intensities / (pred_intensities.sum(dim=-1, keepdim=True) + 1e-8)
+    target_pct = target_intensities / (target_intensities.sum(dim=-1, keepdim=True) + 1e-8)
+    
+    mae = torch.abs(pred_pct - target_pct).mean().item() * 100
+    return mae
+
 def calculate_sisdr(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-8) -> float:
     """Calculate Scale-Invariant Signal-to-Distortion Ratio (SI-SDR) in dB."""
     if pred.ndim == 1:
@@ -73,7 +87,7 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
 
     epoch_loss = 0
     metrics_sum = {
-        'rwp': 0, 'sisdr': 0, 'ratio_mae': 0, 'top10_acc': 0, 'total_count': 0
+        'rwp': 0, 'sisdr': 0, 'quant_mae': 0, 'top10_acc': 0, 'total_count': 0
     }
     
     if args.progress_bar:
@@ -144,6 +158,8 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                         
                         matched_logits = []
                         matched_targets = []
+                        matched_pred_xrds = []
+                        matched_gt_xrds = []
                         for r, c in zip(row_ind, col_ind):
                             gt_idx = torch.where(valid_gt_mask)[0][c]
                             total_loss += criterion_mse(pred_xrds[b, r], gt_xrds[b, gt_idx])
@@ -152,11 +168,16 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                             
                             metrics_sum['rwp'] += calculate_rwp(pred_xrds[b, r], gt_xrds[b, gt_idx])
                             metrics_sum['sisdr'] += calculate_sisdr(pred_xrds[b, r], gt_xrds[b, gt_idx])
-                            metrics_sum['ratio_mae'] += torch.abs(pred_ratios[b, r] - gt_ratios[b, gt_idx]).item()
                             
+                            matched_pred_xrds.append(pred_xrds[b, r])
+                            matched_gt_xrds.append(gt_xrds[b, gt_idx])
                             matched_logits.append(feat_logits[b, r])
                             matched_targets.append(gt_ids[b, gt_idx])
                             metrics_sum['total_count'] += 1
+                            
+                        if matched_pred_xrds:
+                            q_mae = calculate_quantitative_metrics(torch.stack(matched_pred_xrds), torch.stack(matched_gt_xrds))
+                            metrics_sum['quant_mae'] += q_mae * len(matched_pred_xrds)
                         
                         if matched_logits:
                             metrics_sum['top10_acc'] += get_id_acc_topk(torch.stack(matched_logits), torch.stack(matched_targets), k=10) * len(matched_logits)
@@ -187,14 +208,14 @@ def print_log(epoch: int, train_res: Dict, val_res: Dict, lr: float):
         log.printlog(f"Loss (Train/Val): {train_res['loss']:.6f} / {val_res['loss']:.6f}")
         log.printlog(f"RWP (Val):         {val_res['rwp']:.4f}")
         log.printlog(f"SI-SDR (Val):      {val_res['sisdr']:.2f} dB")
-        log.printlog(f"Ratio MAE (Val):   {val_res['ratio_mae']*100:.2f}%")
+        log.printlog(f"Quant MAE (Val):   {val_res['quant_mae']:.2f}%")
         log.printlog(f"Top-10 Acc (Val):  {val_res['top10_acc']*100:.2f}%")
 
         log.train_writer.add_scalar('loss', train_res['loss'], epoch)
         log.val_writer.add_scalar('loss', val_res['loss'], epoch)
         log.val_writer.add_scalar('rwp', val_res['rwp'], epoch)
         log.val_writer.add_scalar('sisdr', val_res['sisdr'], epoch)
-        log.val_writer.add_scalar('ratio_mae', val_res['ratio_mae'], epoch)
+        log.val_writer.add_scalar('quant_mae', val_res['quant_mae'], epoch)
         log.val_writer.add_scalar('top10_acc', val_res['top10_acc'], epoch)
         log.train_writer.add_scalar('lr', lr, epoch)
 

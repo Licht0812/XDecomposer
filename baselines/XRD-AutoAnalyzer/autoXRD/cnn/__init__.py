@@ -34,10 +34,10 @@ class DataSetUp(object):
         Args:
             xrd: a numpy array containing xrd spectra categorized by
                 their associated reference phase.
-                The shape of the array should be NxMx4501x1 where:
+                The shape of the array should be NxMx3500x1 where:
                 N = the number of reference phases,
                 M = the number of augmented spectra per reference phase,
-                4501 = intensities as a function of 2-theta
+                3500 = intensities as a function of 2-theta
                 (spanning from 10 to 80 degrees by default)
             testing_fraction: fraction of data (xrd patterns) to reserve for testing.
                 By default, all spectra will be used for training.

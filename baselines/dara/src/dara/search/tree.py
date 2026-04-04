@@ -992,7 +992,7 @@ class SearchTree(BaseSearchTree):
 
         self.intensity_threshold = min(
             find_optimal_intensity_threshold(self.peak_obs[:, 1]),
-            0.1 * np.max(self.peak_obs[:, 1]),
+            0.01 * np.max(self.peak_obs[:, 1]),
         )
         logger.info(
             f"The intensity threshold is automatically set "

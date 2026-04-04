@@ -7,8 +7,8 @@
 #SBATCH --output=slurm_train_gen-%j.out
 
 # 加载环境
-module load miniconda
-source activate xrd
+# module load miniconda
+# source activate xrd
 
 # 强制使用 CPU，避免大规模分类时的显存溢出和 CUDA 冲突
 # export CUDA_VISIBLE_DEVICES="-1"

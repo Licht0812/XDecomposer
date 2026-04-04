@@ -3,8 +3,7 @@
 #SBATCH --partition=project1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=32
-#SBATCH --mem=256G
+#SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:1             # 申请单卡 GPU
 
 # 环境加载
@@ -20,10 +19,20 @@ LOAD_PATH="/data/home/zdhs0019/Projects/xrd_baselines/XQueryer/output/2026-03-24
 # 执行推理脚本
 # -u 参数确保输出实时刷新到日志文件
 # limit 0 表示评估全部数据，或者设置一个小数值（如 100）进行快速测试
-python -u src/infer.py \
-    --load_path "$LOAD_PATH" \
-    --batch_size 8 \
-    --limit 0 \
-    --threshold 0.3 \
-    --num_slots 4 \
-    --feature_dim 256
+
+echo "Starting inference at $(date)"
+
+for num_phases in 2 3 4
+do
+    echo "Running inference for $num_phases phases..."
+    python -u src/infer.py \
+        --load_path "$LOAD_PATH" \
+        --batch_size 8 \
+        --limit 0 \
+        --threshold 0.3 \
+        --num_slots 4 \
+        --feature_dim 256 \
+        --num_phases $num_phases
+done
+
+echo "Inference finished at $(date)"

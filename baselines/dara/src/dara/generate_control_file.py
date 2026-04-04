@@ -38,16 +38,21 @@ def copy_instrument_files(instrument_profile: str | Path, working_dir: Path) -> 
             f"the provided path and the default path ({default_instrument_path})."
         )
 
-    shutil.copy(instrument_path, working_dir)
+    # Copy all files with the same stem (geq, ger, sav, tpl, etc.)
+    instrument_profile_name = instrument_path.stem
+    for f in instrument_path.parent.glob(f"{instrument_profile_name}.*"):
+        shutil.copy(f, working_dir)
+        
     return instrument_path.stem
 
 
 def copy_xy_pattern(pattern_path: Path, working_dir: Path) -> Path:
     """Copy the xy pattern to the working directory."""
     # if same directory, do nothing
-    if pattern_path.parent != working_dir:
+    dest_path = working_dir / pattern_path.name
+    if str(pattern_path) != str(dest_path):
         shutil.copy(pattern_path, working_dir)
-    return working_dir / pattern_path.name
+    return dest_path
 
 
 def trim_pattern(xy_content: np.ndarray) -> np.ndarray:
@@ -101,12 +106,10 @@ def generate_control_file(
     else:
         control_file_path = working_dir / f"{pattern_path.stem}.sav"
 
-    copy_xy_pattern(pattern_path, control_file_path.parent)
+    xy_pattern_path = copy_xy_pattern(pattern_path, control_file_path.parent)
     instrument_name = copy_instrument_files(
         instrument_profile, control_file_path.parent
     )
-
-    xy_pattern_path = control_file_path.parent / pattern_path.name
 
     try:
         xy_content = np.loadtxt(pattern_path)
@@ -136,8 +139,8 @@ def generate_control_file(
     VERZERR={instrument_name}.geq
     % Wavelength
     {f"LAMBDA={wavelength.upper()}" if isinstance(wavelength, str) else f"SYNCHROTRON={wavelength:.4f}"}
-    {f"WMIN={wmin}" if wmin is not None else ""}
-    {f"WMAX={wmax}" if wmax is not None else ""}
+    {f"WMIN={wmin}" if wmin is not None else "WMIN=5.0"}
+    {f"WMAX={wmax}" if wmax is not None else "WMAX=90.0"}
     % Phases
     {phases_str}
     % Measured data
@@ -153,6 +156,8 @@ def generate_control_file(
     {f"PARAM[{'2' if isinstance(eps1, str) else '1'}]=EPS2={eps2}" if isinstance(eps2, str) else f"EPS2={eps2}"}
     NTHREADS={n_threads}
     PROTOKOLL=Y
+    % Relax background order to avoid singular matrix
+    Background=0_0
     sum={"+".join(phase_name for phase_name in phase_names)}
     {phase_fraction_str}
     {goal_str}

@@ -113,9 +113,9 @@ class SpectrumPlotter(object):
             else:
                 warped_spectrum[ind2] = 0.0
 
-        # Now, upsample spectra back to their original size (4501)
-        warped_spectrum = resample(warped_spectrum, 4501)
-        orig_y = resample(orig_y, 4501)
+        # Now, upsample spectra back to their original size (3500)
+        warped_spectrum = resample(warped_spectrum, 3500)
+        orig_y = resample(orig_y, 3500)
 
         # Scale warped spectrum so y-values match measured spectrum
         scaled_spectrum, scaling_constant = self.scale_spectrum(warped_spectrum, orig_y)
@@ -210,7 +210,7 @@ class SpectrumPlotter(object):
         angles = pattern.x
         intensities = pattern.y
 
-        steps = np.linspace(self.min_angle, self.max_angle, 4501)
+        steps = np.linspace(self.min_angle, self.max_angle, 3500)
 
         signals = np.zeros([len(angles), steps.shape[0]])
 
@@ -222,7 +222,7 @@ class SpectrumPlotter(object):
         # Convolute every row with unique kernel
         # Iterate over rows; not vectorizable, changing kernel for every row
         domain_size = 25.0
-        step_size = (self.max_angle - self.min_angle)/4501
+        step_size = (self.max_angle - self.min_angle)/3500
         for i in range(signals.shape[0]):
             row = signals[i,:]
             ang = steps[np.argmax(row)]
@@ -266,7 +266,7 @@ class SpectrumPlotter(object):
         Args:
             spectrum_name: filename of the spectrum that is being considered
         Returns:
-            ys: Processed XRD spectrum in 4501x1 form.
+            ys: Processed XRD spectrum in 3500x1 form.
         """
 
         ## Load data
@@ -286,7 +286,7 @@ class SpectrumPlotter(object):
 
         ## Fit to 4,501 values as to be compatible with CNN
         f = ip.CubicSpline(x, y)
-        xs = np.linspace(self.min_angle, self.max_angle, 4501)
+        xs = np.linspace(self.min_angle, self.max_angle, 3500)
         ys = f(xs)
 
         if not self.raw:
@@ -329,7 +329,7 @@ class SpectrumPlotter(object):
 
     def get_cont_profile(self, angles, intensities):
 
-        steps = np.linspace(self.min_angle, self.max_angle, 4501)
+        steps = np.linspace(self.min_angle, self.max_angle, 3500)
         signals = np.zeros([len(angles), steps.shape[0]])
 
         for i, ang in enumerate(angles):
@@ -340,7 +340,7 @@ class SpectrumPlotter(object):
         # Convolute every row with unique kernel
         # Iterate over rows; not vectorizable, changing kernel for every row
         domain_size = 25.0
-        step_size = (self.max_angle - self.min_angle)/4501
+        step_size = (self.max_angle - self.min_angle)/3500
         for i in range(signals.shape[0]):
             row = signals[i,:]
             ang = steps[np.argmax(row)]
@@ -466,7 +466,7 @@ class SpectrumPlotter(object):
 
 def XRDtoPDF(xrd, min_angle, max_angle):
 
-    thetas = np.linspace(min_angle/2.0, max_angle/2.0, 4501)
+    thetas = np.linspace(min_angle/2.0, max_angle/2.0, 3500)
     Q = np.array([4*math.pi*math.sin(math.radians(theta))/1.5406 for theta in thetas])
     S = np.array(xrd).flatten()
 
@@ -575,7 +575,7 @@ def main(spectra_directory, spectrum_fname, predicted_phases, scale_factors, red
 
             spec_plot = SpectrumPlotter(spectra_directory, spectrum_fname, predicted_phases, scale_factors, min_angle, max_angle, wavelength, raw)
 
-            x = np.linspace(min_angle, max_angle, 4501)
+            x = np.linspace(min_angle, max_angle, 3500)
             measured_spectrum = spec_plot.formatted_spectrum
             angle_sets, intensity_sets = spec_plot.scaled_patterns
 
