@@ -12,7 +12,7 @@ import warnings
 import matplotlib.transforms as mtransforms
 from torch.utils.data import DataLoader
 from scipy.optimize import linear_sum_assignment
-from model.dataset import ASEDataset
+from model.dataset import RRUFFOnlineMixingDataset
 from model.XQueryer import Xmodel
 import random
 
@@ -293,14 +293,16 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--load_path', default='/data/home/zdhs0019/Projects/xrd_baselines/XQueryer/output/2026-03-24_1725/checkpoints/checkpoint_0010.pth', type=str)
+    parser.add_argument('--load_path', default='/data/home/zdhs0019/Projects/xrd_baselines/XQueryer-ruff/output/2026-04-04_1122_fold_0/checkpoints/checkpoint_0010.pth', type=str)
     parser.add_argument('--db_path', default='/data/group/project1/Crystal/UniqCryLabeled.db', type=str)
     parser.add_argument('--npz_dir', default='/data/group/project1/Crystal/UniqCry', type=str)
     parser.add_argument('--entries_dict', default='./src/entries_dict.json', type=str)
     parser.add_argument('--num_slots', default=4, type=int)
     parser.add_argument('--feature_dim', default=256, type=int)
     parser.add_argument('--num_classes', default=100315, type=int)
-    parser.add_argument('--cif_base_dir', default="/data/group/project1/Crystal/UniqCry/cif_files", type=str)  # 新增：cif文件目录
+    parser.add_argument('--cif_base_dir', default="/data/group/project1/Crystal/UniqCry/cif_files", type=str)
+    parser.add_argument('--fold', default=0, type=int)
+    parser.add_argument('--num_folds', default=5, type=int)
     args = parser.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -315,7 +317,7 @@ if __name__ == '__main__':
     model.load_state_dict(checkpoint['model'])
     model.to(device)
     
-    # Use ASEDataset - note that it returns random mixtures on each call
-    testset = ASEDataset(args.db_path, args.npz_dir, mode='test', encode_element=True, num_classes=args.num_classes)
+    # Use RRUFFOnlineMixingDataset
+    testset = RRUFFOnlineMixingDataset(args.db_path, split='test', num_folds=args.num_folds, fold=args.fold, encode_element=True, num_classes=args.num_classes)
     
     visualize(model, testset, device, entries_dict, cif_base_dir=args.cif_base_dir)
