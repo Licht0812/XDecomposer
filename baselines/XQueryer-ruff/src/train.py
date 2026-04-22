@@ -4,6 +4,7 @@ import os
 from typing import Dict
 import torch
 import torch.distributed as dist
+import torch.nn.functional as F
 from torch import optim
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
@@ -78,6 +79,64 @@ def get_id_acc_topk(logits: torch.Tensor, target_ids: torch.Tensor, k=10):
     correct = (topk_indices == target_ids.unsqueeze(1)).any(dim=1).float()
     return correct.mean().item()
 
+def weighted_xrd_loss(pred: torch.Tensor, target: torch.Tensor, alpha: float = 10.0,
+                      lambda_cos: float = 0.2, lambda_geo: float = 0.1,
+                      beta: float = 0.5, eps: float = 1e-8) -> torch.Tensor:
+    pred = pred.float()
+    target = target.float()
+
+    focal = 1.0 + alpha * target
+    loss_l1 = (torch.abs(pred - target) * focal).mean()
+
+    loss_cos = 1.0 - F.cosine_similarity(pred.unsqueeze(0), target.unsqueeze(0), dim=-1, eps=eps).mean()
+
+    pred_sqrt = torch.sqrt(torch.clamp(pred, min=eps))
+    target_sqrt = torch.sqrt(torch.clamp(target, min=eps))
+    grad1 = torch.abs((pred_sqrt[1:] - pred_sqrt[:-1]) - (target_sqrt[1:] - target_sqrt[:-1])).mean()
+    grad2 = torch.abs(
+        (pred_sqrt[2:] - 2 * pred_sqrt[1:-1] + pred_sqrt[:-2]) -
+        (target_sqrt[2:] - 2 * target_sqrt[1:-1] + target_sqrt[:-2])
+    ).mean()
+    loss_geo = grad1 + beta * grad2
+
+    return loss_l1 + lambda_cos * loss_cos + lambda_geo * loss_geo
+
+def build_matching_cost(pred_xrds: torch.Tensor, gt_xrds: torch.Tensor) -> torch.Tensor:
+    cost_matrix = torch.zeros(pred_xrds.size(0), gt_xrds.size(0), device=pred_xrds.device)
+    for i in range(pred_xrds.size(0)):
+        for j in range(gt_xrds.size(0)):
+            cost_matrix[i, j] = weighted_xrd_loss(pred_xrds[i], gt_xrds[j]).detach()
+    return cost_matrix
+
+def compute_sample_objective(pred_xrds: torch.Tensor, pred_ratios: torch.Tensor, feat_logits: torch.Tensor,
+                             gt_xrds: torch.Tensor, gt_ratios: torch.Tensor, gt_ids: torch.Tensor,
+                             mixture: torch.Tensor, criterion_ratio, criterion_cls,
+                             lambda_ratio: float = 1.0, lambda_cls: float = 0.1,
+                             lambda_mix: float = 1.0, lambda_empty: float = 0.5):
+    valid_gt_mask = gt_ratios > 1e-6
+    valid_gt_indices = torch.where(valid_gt_mask)[0]
+    matched_rows = torch.zeros(pred_xrds.size(0), dtype=torch.bool, device=pred_xrds.device)
+    sample_loss = lambda_mix * F.l1_loss(pred_xrds.sum(dim=0), mixture)
+    row_ind, col_ind = np.array([], dtype=np.int64), np.array([], dtype=np.int64)
+
+    if valid_gt_indices.numel() > 0:
+        gt_active_xrds = gt_xrds[valid_gt_indices]
+        cost_matrix = build_matching_cost(pred_xrds.float(), gt_active_xrds.float()).cpu().numpy()
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+        for r, c in zip(row_ind, col_ind):
+            gt_idx = valid_gt_indices[c]
+            sample_loss = sample_loss + weighted_xrd_loss(pred_xrds[r], gt_xrds[gt_idx])
+            sample_loss = sample_loss + lambda_ratio * criterion_ratio(pred_ratios[r], gt_ratios[gt_idx])
+            sample_loss = sample_loss + lambda_cls * criterion_cls(feat_logits[r].unsqueeze(0), gt_ids[gt_idx].unsqueeze(0))
+            matched_rows[r] = True
+
+    if (~matched_rows).any():
+        sample_loss = sample_loss + lambda_empty * pred_xrds[~matched_rows].abs().mean()
+        sample_loss = sample_loss + lambda_empty * pred_ratios[~matched_rows].mean()
+
+    return sample_loss, row_ind, col_ind, valid_gt_indices
+
 def run_one_epoch(model, dataloader, optimizer, epoch, mode):
     if mode == 'Train':
         model.train()
@@ -95,7 +154,7 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
         pbar = tqdm(total=len(dataloader.dataset), desc=desc, unit='data')
     iters = len(dataloader)
 
-    criterion_mse = torch.nn.MSELoss()
+    criterion_ratio = torch.nn.L1Loss()
     criterion_cls = torch.nn.CrossEntropyLoss()
 
     for i, batch in enumerate(dataloader):
@@ -117,22 +176,12 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                 batch_size = intensity.size(0)
                 
                 for b in range(batch_size):
-                    valid_gt_mask = gt_ratios[b] > 1e-6
-                    num_valid_gt = valid_gt_mask.sum().item()
-                    
-                    if num_valid_gt > 0:
-                        # Cost matrix: MSE between all pairs of (pred_xrd, gt_xrd)
-                        # Convert to float32 as cdist might not support float16
-                        cost_matrix = torch.cdist(pred_xrds[b].float(), gt_xrds[b][valid_gt_mask].float(), p=2).cpu().detach().numpy()
-                        row_ind, col_ind = linear_sum_assignment(cost_matrix)
-                        
-                        for r, c in zip(row_ind, col_ind):
-                            gt_idx = torch.where(valid_gt_mask)[0][c]
-                            total_loss += criterion_mse(pred_xrds[b, r], gt_xrds[b, gt_idx])
-                            total_loss += criterion_mse(pred_ratios[b, r], gt_ratios[b, gt_idx])
-                            total_loss += criterion_cls(feat_logits[b, r].unsqueeze(0), gt_ids[b, gt_idx].unsqueeze(0))
-                    else:
-                        total_loss += pred_ratios[b].pow(2).sum()
+                    sample_loss, _, _, _ = compute_sample_objective(
+                        pred_xrds[b], pred_ratios[b], feat_logits[b],
+                        gt_xrds[b], gt_ratios[b], gt_ids[b], intensity[b],
+                        criterion_ratio, criterion_cls
+                    )
+                    total_loss += sample_loss
 
                 loss = total_loss / batch_size
 
@@ -150,23 +199,20 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                 total_loss = 0
                 batch_size = intensity.size(0)
                 for b in range(batch_size):
-                    valid_gt_mask = gt_ratios[b] > 1e-6
-                    num_valid_gt = valid_gt_mask.sum().item()
-                    if num_valid_gt > 0:
-                        # Convert to float32 for cdist
-                        cost_matrix = torch.cdist(pred_xrds[b].float(), gt_xrds[b][valid_gt_mask].float(), p=2).cpu().numpy()
-                        row_ind, col_ind = linear_sum_assignment(cost_matrix)
-                        
+                    sample_loss, row_ind, col_ind, valid_gt_indices = compute_sample_objective(
+                        pred_xrds[b], pred_ratios[b], feat_logits[b],
+                        gt_xrds[b], gt_ratios[b], gt_ids[b], intensity[b],
+                        criterion_ratio, criterion_cls
+                    )
+                    total_loss += sample_loss
+
+                    if valid_gt_indices.numel() > 0:
                         matched_logits = []
                         matched_targets = []
                         matched_pred_xrds = []
                         matched_gt_xrds = []
                         for r, c in zip(row_ind, col_ind):
-                            gt_idx = torch.where(valid_gt_mask)[0][c]
-                            total_loss += criterion_mse(pred_xrds[b, r], gt_xrds[b, gt_idx])
-                            total_loss += criterion_mse(pred_ratios[b, r], gt_ratios[b, gt_idx])
-                            total_loss += criterion_cls(feat_logits[b, r].unsqueeze(0), gt_ids[b, gt_idx].unsqueeze(0))
-                            
+                            gt_idx = valid_gt_indices[c]
                             metrics_sum['rwp'] += calculate_rwp(pred_xrds[b, r], gt_xrds[b, gt_idx])
                             metrics_sum['sisdr'] += calculate_sisdr(pred_xrds[b, r], gt_xrds[b, gt_idx])
                             
@@ -182,8 +228,6 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                         
                         if matched_logits:
                             metrics_sum['top10_acc'] += get_id_acc_topk(torch.stack(matched_logits), torch.stack(matched_targets), k=10) * len(matched_logits)
-                    else:
-                        total_loss += pred_ratios[b].pow(2).sum()
                 
                 loss = total_loss / batch_size
 

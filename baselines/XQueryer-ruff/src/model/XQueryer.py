@@ -14,41 +14,45 @@ class Xmodel(nn.Module):
         super().__init__()
 
         self.embed_dim = embed_dim
+        self.xrd_length = embed_dim
+        head_multiple = nhead if nhead % 2 == 0 else nhead * 2
+        self.attn_dim = dim_feedforward - (dim_feedforward % head_multiple)
+        if self.attn_dim == 0:
+            self.attn_dim = head_multiple
         self.num_slots = num_slots
         self.feature_dim = feature_dim
         self.num_classes = num_classes
 
         self.conv = ConvModule(drop_rate=dropout)
+        self.input_proj = nn.Conv1d(32 * 6 * 4, self.attn_dim, kernel_size=1)
 
         # Learnable slot tokens (queries for each potential phase)
-        self.slot_tokens = nn.Parameter(torch.zeros(1, num_slots, embed_dim))
-        self.pos_embed = nn.Parameter(torch.zeros(1, embed_dim, dim_feedforward))
+        self.slot_tokens = nn.Parameter(torch.zeros(1, num_slots, self.attn_dim))
+        self.pos_embed = nn.Parameter(torch.zeros(1, self.xrd_length, self.attn_dim), requires_grad=False)
 
         # -------------encoder----------------
-        sa_layer = CrossAttnLayer(embed_dim, nhead, dim_feedforward, dropout, activation)
+        sa_layer = CrossAttnLayer(self.attn_dim, nhead, self.attn_dim * 2, dropout, activation)
         self.encoder = SelfAttnModule(sa_layer, num_encoder_layers,)
         # ------------------------------------
 
-        self.norm_after = nn.LayerNorm(embed_dim)
+        self.norm_after = nn.LayerNorm(self.attn_dim)
 
         # Heads for each slot
-        self.xrd_head = nn.Sequential(
-            nn.Linear(embed_dim, 2048),
+        self.mask_head = nn.Sequential(
+            nn.Linear(self.attn_dim, self.attn_dim),
             nn.ReLU(inplace=True),
-            nn.Linear(2048, embed_dim),
-            nn.Sigmoid() # XRD intensity is normalized [0, 1]
+            nn.Linear(self.attn_dim, self.xrd_length),
+            nn.Sigmoid()  # Output a mask in [0, 1]
         )
         
         self.ratio_head = nn.Sequential(
-            nn.Linear(embed_dim, 512),
+            nn.Linear(self.attn_dim, self.attn_dim // 2),
             nn.ReLU(inplace=True),
-            nn.Linear(512, 1),
-            nn.Softmax(dim=1) # Ratios should sum to 1 across slots? 
-            # Or Sigmoid if we treat them independently and normalize later
+            nn.Linear(self.attn_dim // 2, 1)
         )
 
         self.feature_head = nn.Sequential(
-            nn.Linear(embed_dim, 1024),
+            nn.Linear(self.attn_dim, 1024),
             nn.ReLU(inplace=True),
             nn.Linear(1024, feature_dim)
         )
@@ -67,15 +71,14 @@ class Xmodel(nn.Module):
     def init_weights(self):
         trunc_normal_(self.slot_tokens, std=.02)
 
-        self.pos_embed.requires_grad = False
-
-        pos_embed = get_1d_sincos_pos_embed_from_grid(self.embed_dim, np.array(range(self.pos_embed.shape[2])))
-        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).T.unsqueeze(0))
+        pos_embed = get_1d_sincos_pos_embed_from_grid(self.attn_dim, np.array(range(self.pos_embed.shape[1])))
+        self.pos_embed.data.copy_(torch.from_numpy(pos_embed).unsqueeze(0))
 
     def forward(self, x, elem):
         # x: (N, 3500)
-        x = x[:, :3500]
+        x = x[:, :self.xrd_length]
         N = x.shape[0]
+        mixture = x
         
         sampling_rate = 1.0 
         x = x.unsqueeze(1) # N*1*3500
@@ -86,36 +89,28 @@ class Xmodel(nn.Module):
         x3 = self.conv(SignalProcessor(x, sampling_rate).filter_high_frequencies(percentage=0.6))
         x4 = self.conv(SignalProcessor(x, sampling_rate).filter_high_frequencies(percentage=0.9))
 
-        x = torch.cat((x1, x2, x3, x4,), dim=1) # N*768*3500
+        x = torch.cat((x1, x2, x3, x4), dim=1)  # N*768*3500
+        x = self.input_proj(x)  # N*attn_dim*3500
+        x = x.permute(2, 0, 1).contiguous()  # 3500*N*attn_dim
 
-        # Encoder expects (L, N, E)
-        # Here x is (N, 768, 3500), we treat 768 as the sequence length L? 
-        # Actually in original code: x = x.permute(1, 0, 2).contiguous() -> (768, N, 3500)
-        # So E = 3500, L = 768
-        x = x.permute(1, 0, 2).contiguous() # 768*N*3500
-
-        pos_embed = self.pos_embed.permute(2, 0, 1).contiguous().repeat(1, N, 1) 
-
-        # Prepare element info as query? No, the user wants Slots to be queries.
-        # But CrossAttnLayer currently uses elem to generate queries. 
-        # We need to modify CrossAttnLayer to accept our slot_tokens as queries.
+        pos_embed = self.pos_embed.permute(1, 0, 2).contiguous().repeat(1, N, 1)
         
-        slots = self.slot_tokens.repeat(N, 1, 1).permute(1, 0, 2).contiguous() # num_slots, N, embed_dim
-
-        # Modify: Cross-attention between slots (Q) and XRD features (K, V)
-        # We also want to incorporate element info. 
-        # Let's pass elem to the encoder as well.
-        elem = elem.unsqueeze(1).permute(1, 0, 2).contiguous() # 1*N*92
+        slots = self.slot_tokens.repeat(N, 1, 1).permute(1, 0, 2).contiguous()  # num_slots, N, attn_dim
+        elem = elem.unsqueeze(0).contiguous()  # 1*N*92
 
         feats = self.encoder(slots, pos_embed, elem, keys=x)
-        feats = self.norm_after(feats) # num_slots, N, embed_dim
+        feats = self.norm_after(feats) # num_slots, N, attn_dim
         
-        # feats is (num_slots, N, embed_dim), we want (N, num_slots, embed_dim)
+        # feats is (num_slots, N, attn_dim), we want (N, num_slots, attn_dim)
         feats = feats.permute(1, 0, 2).contiguous()
         
-        # Output for each slot
-        pred_xrds = self.xrd_head(feats) # N, num_slots, 3500
-        pred_ratios = self.ratio_head(feats).squeeze(-1) # N, num_slots
+        # Predict bounded masks and gate them with slot activity.
+        pred_masks = self.mask_head(feats)  # N, num_slots, 3500
+        slot_gates = torch.sigmoid(self.ratio_head(feats))  # N, num_slots, 1
+        pred_xrds = pred_masks * slot_gates * mixture.unsqueeze(1)
+
+        slot_energy = pred_xrds.sum(dim=-1)
+        pred_ratios = slot_energy / (slot_energy.sum(dim=1, keepdim=True) + 1e-8)
         pred_features = self.feature_head(feats) # N, num_slots, feature_dim
         feat_logits = self.feat_cls_head(pred_features) # N, num_slots, num_classes
      
@@ -227,7 +222,7 @@ class CrossAttnLayer(nn.Module):
         # element_map to incorporate chemical information into the queries
         self.element_map = nn.Sequential(  
             nn.Linear(92, d_model),   
-            nn.Dropout(0.5),  
+            nn.Dropout(0.1),  
             nn.ReLU(),
         )
 

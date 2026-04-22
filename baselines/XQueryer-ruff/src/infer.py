@@ -232,7 +232,7 @@ def calculate_quantitative_metrics(pred_patterns: torch.Tensor, target_patterns:
     mae = torch.abs(pred_pct - target_pct).mean().item() * 100
     return {'quant_mae': mae, 'pred_pct': pred_pct, 'target_pct': target_pct}
 
-def run_one_epoch(model, dataloader, device, entries_dict, threshold=0.3, save_path='inference_results.json', limit=0):
+def run_one_epoch(model, dataloader, device, entries_dict, threshold=0.05, save_path='inference_results.json', limit=0):
     model.eval()
     total_to_eval = len(dataloader.dataset) if limit == 0 else min(limit, len(dataloader.dataset))
     pbar = tqdm(total=total_to_eval, desc='Evaluating... ', unit='data')
@@ -522,7 +522,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_slots', default=4, type=int)
     parser.add_argument('--feature_dim', default=256, type=int)
     parser.add_argument('--entries_dict', default='./entries_dict.json', type=str)
-    parser.add_argument('--threshold', default=0.3, type=float, help='Threshold for phase identification')
+    parser.add_argument('--threshold', default=0.05, type=float, help='Threshold for phase identification')
     parser.add_argument('--limit', default=0, type=int, help='Limit number of samples to evaluate (0 for all)')
     parser.add_argument('--num_phases', type=int, default=0, help='Specify a fixed number of phases (2, 3, or 4). Default 0 for random mix.')
     parser.add_argument('--fold', default=0, type=int, help='Current fold index')
