@@ -4,7 +4,7 @@
 
 
 <p align="center">
-  <b>Deep Learning Framework for Multiphase Whole-Pattern XRD Decomposition</b>
+  <b>Learning Prior-Free Set Decomposition for Multiphase X-ray Diffraction</b>
 </p>
 
 <p align="center">
