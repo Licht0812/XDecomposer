@@ -1,0 +1,8 @@
+model_ablation:
+  use_transformer: false
+  use_film: true
+  use_skip_connections: true
+  mask_type: soft
+
+training_ablation:
+  lambda_geo: 5.0

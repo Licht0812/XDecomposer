@@ -1,0 +1,76 @@
+# Transformer-family baseline training defaults.
+# Command-line args override values here.
+
+run_name: separation
+baseline_name: transformer        # transformer | itransformer | patchtst
+
+experiment_name_template: "{baseline_name}_{run_name}"
+save_dir_template: "${PATH_TEMPLATE_BASELINE_SAVE_DIR}"
+swanlab_project: "XRD-Transformer-Baselines"
+
+data:
+  # Paths come from configs/paths.sh.
+  singlephase_xrd_db: "${PATH_DATA_SINGLEPHASE}"
+  crystal_db: "${PATH_DATA_CRYSTAL_DB}"
+  mae_checkpoint: "${PATH_CKPT_PRETRAIN}"
+
+  xrd_length: 3500
+  num_phases: 4                  # output slots
+
+  # Online mixing K range. max_k=null means max_k=num_phases.
+  min_k: 2
+  max_k: null
+  k_weights: null                # null = uniform over min_k..max_k; fixed K: min_k=max_k and [1.0]
+
+  batch_size: 256                # per process
+  num_workers: 8                 # use 0 for debugging; raise on cluster if I/O is slow
+  augment: true
+  pin_memory: false
+  noise_level: 0.001             # used only when augment=true
+  seed: 42
+
+model:
+  # Must match the MAE checkpoint.
+  patch_len: 50
+  stride: 25
+
+  # null = infer from MAE checkpoint.
+  d_model: null
+  n_heads: null
+  n_layers: null
+
+  dropout: 0.1
+  freeze_backbone: false
+  output_activation: relu        # relu | softplus | none
+
+  # Transformer baseline.
+  transformer_decoder_layers: 4
+  transformer_d_ff: null         
+
+  # iTransformer baseline.
+  itransformer_dim: 256
+  itransformer_layers: 2
+  itransformer_heads: 8          # must divide itransformer_dim
+  itransformer_d_ff: null        # null = 4*itransformer_dim
+
+optimization:
+  epochs: 1000                   # smoke test: override to 1
+  lr: 2.0e-4
+  weight_decay: 0.05
+
+  warmup_steps: 0                # >0 overrides warmup_epochs
+  warmup_epochs: 20
+  lr_scheduler: cosine           # cosine | noam
+  noam_factor: 1.0
+  clip_grad: 1.0                 # 0 disables clipping
+
+loss:
+  lambda_activity: 2.0
+
+runtime:
+  resume: null                   # full state resume
+  finetune: null                 # weights only, reset optimizer/scheduler
+  max_train_steps: null          # smoke test only; null/0 = full epoch
+  max_val_steps: null            # smoke test only; null/0 = full validation
+  vis_interval: 10             # 0 disables visualization
+  disable_swanlab: false

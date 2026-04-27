@@ -1,0 +1,10 @@
+numpy
+pymatgen
+scipy
+scikit-image>=0.23.1
+tensorflow>=2.16
+pyxtal
+pyts
+tqdm
+asteval
+numexpr>=2.8.3

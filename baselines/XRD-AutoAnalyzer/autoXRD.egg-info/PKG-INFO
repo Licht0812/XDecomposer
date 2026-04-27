@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: autoXRD
+Version: 0.0.6
+Summary: A package for automated XRD analysis
+Author-email: "Nathan J. Szymanski" <nathan_szymanski@berkeley.edu>
+Project-URL: Homepage, https://github.com/njszym/XRD-AutoAnalyzer
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: pymatgen
+Requires-Dist: scipy
+Requires-Dist: scikit-image>=0.23.1
+Requires-Dist: tensorflow>=2.16
+Requires-Dist: pyxtal
+Requires-Dist: pyts
+Requires-Dist: tqdm
+Requires-Dist: asteval
+Requires-Dist: numexpr>=2.8.3
+Dynamic: license-file
