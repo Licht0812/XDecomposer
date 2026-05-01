@@ -36,8 +36,8 @@ class RRUFFOnlineMixingDataset(Dataset):
     """
     Dataset for online mixing of single-phase XRD patterns from the RRUFF database.
     """
-    def __init__(self, rruff_db_path, min_k=2, max_k=4, k_weights=None, min_weight=0.1, 
-                 weight_distribution="random", target_length=3500, theta_min=10.0, 
+    def __init__(self, rruff_db_path, min_k=2, max_k=4, k_weights=None, min_weight=0.1,
+                 weight_distribution="random", target_length=3500, theta_min=10.0,
                  theta_max=80.0, split='all', num_folds=5, fold=0, seed=42, encode_element=True, num_classes=100315):
         self.rruff_db_path = rruff_db_path
         self.min_k = min_k
@@ -50,14 +50,14 @@ class RRUFFOnlineMixingDataset(Dataset):
         self.split = split
         self.encode_element = encode_element
         self.num_classes = num_classes
-        
+
         current_dir = os.path.dirname(os.path.abspath(__file__))
         emb_path = os.path.join(current_dir, '..', 'CGCNN_atom_emb.json')
         with open(emb_path , 'r') as file:
             self.cgcnn_emb = json.load(file)
-            
+
         self.phases = []  # List of (id, rruff_id, intensity_array, symbols)
-        
+
         preprocessed_dir = os.path.join(os.path.dirname(rruff_db_path), "rruff_processed")
         if os.path.isdir(preprocessed_dir):
             print(f"Loading preprocessed RRUFF npz files from {preprocessed_dir}...")
@@ -65,9 +65,9 @@ class RRUFFOnlineMixingDataset(Dataset):
         else:
             print("Processing from standard Database (This will take a while for ALS baseline removal)...")
             self._load_db()
-            
+
         print(f"Loaded {len(self.phases)} total valid XRD patterns from RRUFF before splitting.")
-        
+
         if split != 'all':
             self._perform_kfold_split(split, num_folds, fold, seed)
 
@@ -93,11 +93,11 @@ class RRUFFOnlineMixingDataset(Dataset):
             data_dict = row.data
             if not data_dict or "angle" not in data_dict or "intensity" not in data_dict:
                 continue
-            
+
             try:
                 angles = np.array(data_dict["angle"])
                 intensities = np.array(data_dict["intensity"])
-                
+
                 try:
                     baseline = baseline_als(intensities)
                     intensities = np.clip(intensities - baseline, 0, None)
@@ -110,14 +110,14 @@ class RRUFFOnlineMixingDataset(Dataset):
 
                 if std_intensities.max() > 0:
                     std_intensities = std_intensities / std_intensities.max()
-                    
+
                 rruff_id = row.get("rruff_id", f"ID_{s_id}")
-                
+
                 atoms = row.toatoms()
                 symbols = set(atoms.get_chemical_symbols())
-                
+
                 self.phases.append((s_id, rruff_id, std_intensities.astype(np.float32), symbols))
-                
+
                 np.savez_compressed(os.path.join(preprocessed_dir, f"rruff_{s_id}.npz"), y=std_intensities, symbols=np.array(list(symbols)))
 
             except Exception as e:
@@ -128,17 +128,17 @@ class RRUFFOnlineMixingDataset(Dataset):
         rng = random.Random(seed)
         indices = list(range(len(self.phases)))
         rng.shuffle(indices)
-        
+
         fold_size = len(indices) // num_folds
         val_start = fold * fold_size
         val_end = (fold + 1) * fold_size if fold < num_folds - 1 else len(indices)
         val_indices = set(indices[val_start:val_end])
-        
+
         if split == 'train':
             self.phases = [self.phases[i] for i in range(len(self.phases)) if i not in val_indices]
         elif split in ['val', 'test']:
             self.phases = [self.phases[i] for i in range(len(self.phases)) if i in val_indices]
-            
+
         print(f"[{split.upper()} Fold {fold+1}/{num_folds}] Using {len(self.phases)} base patterns for mixing.")
 
     def __len__(self):
@@ -169,9 +169,9 @@ class RRUFFOnlineMixingDataset(Dataset):
             k = random.choices(range(self.min_k, self.max_k + 1), weights=self.k_weights, k=1)[0]
         else:
             k = random.randint(self.min_k, self.max_k)
-            
+
         chosen_phases = random.sample(self.phases, k)
-        
+
         if self.weight_distribution == "equal":
             weights = np.ones(k) / k
         else:
@@ -181,15 +181,15 @@ class RRUFFOnlineMixingDataset(Dataset):
             else:
                 raw_weights = np.random.dirichlet(np.ones(k))
                 weights = raw_weights * rem + self.min_weight
-        
+
         mixed_intensity = np.zeros(self.target_length, dtype=np.float32)
         base_intensities = []
         base_ids = []
         all_symbols = set()
-        
+
         multi_hot = torch.zeros(self.num_classes)
         ratios_vec = torch.zeros(self.num_classes)
-        
+
         for i, (p_id, r_id, p_intensity, symbols) in enumerate(chosen_phases):
             weighted_intensity = weights[i] * p_intensity
             mixed_intensity += weighted_intensity
@@ -199,16 +199,16 @@ class RRUFFOnlineMixingDataset(Dataset):
             if p_id < self.num_classes:
                 multi_hot[p_id] = 1.0
                 ratios_vec[p_id] = float(weights[i])
-            
+
         if mixed_intensity.max() > 0:
             scale = mixed_intensity.max()
             mixed_intensity /= scale
             base_intensities = [b / scale for b in base_intensities]
-            
+
         gt_xrds = torch.zeros(self.max_k, self.target_length)
         gt_ratios = torch.zeros(self.max_k)
         gt_ids = torch.full((self.max_k,), -1, dtype=torch.long)
-        
+
         for i in range(k):
             gt_xrds[i] = torch.from_numpy(base_intensities[i])
             gt_ratios[i] = float(weights[i])
@@ -230,7 +230,6 @@ class RRUFFOnlineMixingDataset(Dataset):
             'gt_ratios': gt_ratios,
             'gt_ids': gt_ids
         }
-
 
 @dataclass
 class OnlineMixingConfig:
@@ -262,7 +261,7 @@ def load_npz_pattern(file_path: str, key_priority: List[str] = None, shift: int 
                     # Clean NaN/Inf values
                     if np.isnan(arr).any() or np.isinf(arr).any():
                         arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
-                    
+
                     if arr.ndim == 2: arr = arr[0]
                     arr = arr.astype(np.float32)
 
@@ -276,7 +275,7 @@ def load_npz_pattern(file_path: str, key_priority: List[str] = None, shift: int 
                             arr = np.concatenate([np.zeros(shift), arr[:-shift]])
                         else:
                             arr = np.concatenate([arr[-shift:], np.zeros(-shift)])
-                    
+
                     return arr
             return None
     except Exception:
@@ -293,42 +292,42 @@ def process_pattern(pattern: np.ndarray, length: int) -> torch.Tensor:
     return tensor
 
 class ASEDataset(Dataset):
-    def __init__(self, db_path, npz_dir, mode='train', encode_element=True, num_classes=100315, 
+    def __init__(self, db_path, npz_dir, mode='train', encode_element=True, num_classes=100315,
                  config: Optional[OnlineMixingConfig] = None):
-        
+
         # Get the directory of the current script (src/model/)
         current_dir = os.path.dirname(os.path.abspath(__file__))
         emb_path = os.path.join(current_dir, '..', 'CGCNN_atom_emb.json')
-        
+
         with open(emb_path , 'r') as file:
             self.cgcnn_emb = json.load(file)
-        
+
         self.db_path = db_path
         self.npz_dir = npz_dir
         self.mode = mode
         self.encode_element = encode_element
         self.num_classes = num_classes
         self.config = config if config is not None else OnlineMixingConfig()
-        
+
         # Step 1: Build or Load Index
         self.label_to_data = self._build_or_load_index()
         all_labels = sorted(list(self.label_to_data.keys()))
-        
+
         # Step 2: Split by ID
         random.seed(self.config.SEED)
         random.shuffle(all_labels)
-        
+
         n = len(all_labels)
         train_end = int(n * 0.8)
         val_end = int(n * 0.9)
-        
+
         if mode == 'train':
             self.active_labels = all_labels[:train_end]
         elif mode == 'val':
             self.active_labels = all_labels[train_end:val_end]
         else:
             self.active_labels = all_labels[val_end:]
-            
+
         print(f"Loaded {mode} dataset: {len(self.active_labels)} phases (Crystal IDs)")
 
     def _build_or_load_index(self) -> Dict[int, Dict[str, Any]]:
@@ -349,7 +348,7 @@ class ASEDataset(Dataset):
                         if label not in label_to_paths: label_to_paths[label] = []
                         label_to_paths[label].append(path)
                     except: continue
-        
+
         db = ase.db.connect(self.db_path)
         index = {}
         for row in db.select():
@@ -363,13 +362,13 @@ class ASEDataset(Dataset):
                 element_encode = self.symbol_to_atomic_number(symbols)
                 element_values = [self.cgcnn_emb[str(code)] for code in element_encode if str(code) in self.cgcnn_emb]
                 elem_emb = torch.mean(torch.tensor(element_values, dtype=torch.float32), dim=0) if element_values else torch.zeros(92)
-                
+
                 index[label] = {
                     'paths': label_to_paths[label],
                     'element_emb': elem_emb,
                     'symbols': symbols
                 }
-        
+
         try:
             with open(cache_path, 'wb') as f: pickle.dump(index, f)
         except: pass
@@ -414,17 +413,17 @@ class ASEDataset(Dataset):
             k = np.random.choice(k_options, p=weights_subset)
         else:
             k = random.randint(self.config.MIN_K, self.config.MAX_K)
-            
+
         selected_labels = random.sample(self.active_labels, k)
-        
+
         rem = 1.0 - k * self.config.MIN_WEIGHT
         weights = (np.random.dirichlet(np.ones(k)) * rem + self.config.MIN_WEIGHT) if rem > 0 else np.ones(k)/k
-        
+
         mix = torch.zeros(self.config.XRD_LENGTH)
         multi_hot = torch.zeros(self.num_classes)
         ratios_vec = torch.zeros(self.num_classes)
         all_symbols = set()
-        
+
         gt_xrds = torch.zeros(self.config.MAX_K, self.config.XRD_LENGTH)
         gt_ratios = torch.zeros(self.config.MAX_K)
         gt_ids = torch.full((self.config.MAX_K,), -1, dtype=torch.long)
@@ -437,7 +436,7 @@ class ASEDataset(Dataset):
         for i, label in enumerate(selected_labels):
             info = self.label_to_data[label]
             paths = info['paths']
-            
+
             # Retry to find a valid non-zero pattern for this label
             t = None
             for _ in range(5): # Increase retries
@@ -446,7 +445,7 @@ class ASEDataset(Dataset):
                 if pattern is not None:
                     t = process_pattern(pattern, self.config.XRD_LENGTH)
                     break
-            
+
             # If still None, try to pick a completely different label as a fallback
             # to ensure the mixture is always valid
             if t is None:
@@ -461,26 +460,26 @@ class ASEDataset(Dataset):
                         label = fallback_label # Update label to the fallback one
                         info = self.label_to_data[label]
                         break
-            
+
             if t is None:
                 # Last resort: if still None (very unlikely), use zero but log it
                 t = torch.zeros(self.config.XRD_LENGTH)
-            
+
             mix += t * weights[i]
             multi_hot[int(label)] = 1.0
             ratios_vec[int(label)] = float(weights[i])
             all_symbols.update(info['symbols'])
-            
+
             # Store ground truth for slot matching
             if i < self.config.MAX_K:
                 gt_xrds[i] = t
                 gt_ratios[i] = float(weights[i])
                 gt_ids[i] = int(label)
-            
+
         if self.mode == 'train' and self.config.AUGMENT:
             noise = torch.randn_like(mix) * self.config.NOISE_LEVEL * (mix.max() + 1e-8)
             mix = torch.clamp(mix + noise, min=0)
-            
+
         scale = mix.max() + 1e-8 if self.config.NORM_METHOD == "max" else 1.0
         mix_norm = mix / scale
 
@@ -504,9 +503,6 @@ class ASEDataset(Dataset):
             'gt_ratios': gt_ratios,
             'gt_ids': gt_ids
         }
-    
-
-
 
 class EXPDataset(Dataset):
     def __init__(self, db_paths,encode_element):
@@ -522,7 +518,7 @@ class EXPDataset(Dataset):
         return total_length
 
     def __getitem__(self, idx):
-        
+
         cumulative_length = 0
         for i, db in enumerate(self.dbs):
             if idx < cumulative_length + len(db):
@@ -541,12 +537,12 @@ class EXPDataset(Dataset):
                     # mean pooling
                     element_value=torch.mean(torch.tensor(element_value, dtype=torch.float32),dim=0)
                 # Extract relevant data from the row
-         
+
                 latt_dis = ast.literal_eval(getattr(row, 'angle'))
                 intensity = ast.literal_eval(getattr(row, 'intensity'))
 
                 """
-                提前过滤数据,删除不对齐的情况
+                Filter misaligned samples early.
                 min_length = min(len(latt_dis), len(intensity))
                 latt_dis = latt_dis[:min_length]
                 intensity = intensity[:min_length]
@@ -555,7 +551,7 @@ class EXPDataset(Dataset):
                 int_int = self.upsample(np.column_stack((latt_dis, intensity)))
                 # the str ID of RRUFF database
                 id_num = adjusted_idx +1 # adjusted_idx +1 is the real data index in RRUFF database
-                
+
                 # Convert to tensors
                 #tensor_latt_dis = torch.tensor(latt_dis, dtype=torch.float32)
                 tensor_intensity = torch.tensor(int_int, dtype=torch.float32)
@@ -573,7 +569,7 @@ class EXPDataset(Dataset):
                         'intensity': tensor_intensity,
                         'id': tensor_id,
                         'element': torch.zeros(92, dtype=torch.int)
-                    }              
+                    }
             cumulative_length += len(db)
 
     def symbol_to_atomic_number(self,symbol_list):
@@ -604,7 +600,7 @@ class EXPDataset(Dataset):
             'Rg': 111, 'Cn': 112, 'Nh': 113, 'Fl': 114, 'Mc': 115,
             'Lv': 116, 'Ts': 117, 'Og': 118
         }
-        
+
         atomic_number_list = []
         if symbol_list == []: atomic_number_list.append(0)
         else:
@@ -613,9 +609,9 @@ class EXPDataset(Dataset):
                     atomic_number_list.append(atomic_numbers[symbol])
                 else:
                     atomic_number_list.append(0)  # Append None if symbol not in the dictionary
-            
+
         return atomic_number_list
-    
+
     def upsample(self, rows):
         rows = np.array(rows, dtype=object)
         _, unique_indices = np.unique(rows[:, 0], return_index=True)

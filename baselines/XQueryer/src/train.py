@@ -10,20 +10,6 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from model.dataset import ASEDataset
-from model.XQueryer import Xmodel
-from util.logger import Logger
-
-import argparse
-import math
-import os
-from typing import Dict
-import torch
-import torch.distributed as dist
-from torch import optim
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
@@ -31,27 +17,20 @@ from model.dataset import ASEDataset
 from model.XQueryer import Xmodel
 from util.logger import Logger
 
-def calculate_rwp(pred_pattern: torch.Tensor, target_pattern: torch.Tensor, epsilon: float = 1e-8) -> float:
-    """Calculate R-weighted Profile (Rwp)."""
-    target_pattern, pred_pattern = torch.clamp(target_pattern, min=0), torch.clamp(pred_pattern, min=0)
-    diff_sq = (target_pattern - pred_pattern) ** 2
-    numerator = torch.sum(diff_sq, dim=-1)
-    denominator = torch.sum(target_pattern ** 2, dim=-1) + epsilon
-    return torch.sqrt(numerator / denominator).mean().item()
+def calculate_pearson_correlation(pred_pattern: torch.Tensor, target_pattern: torch.Tensor) -> float:
+    """Calculate Pearson correlation coefficient."""
+    if pred_pattern.dim() == 1:
+        pred_pattern = pred_pattern.unsqueeze(0)
+        target_pattern = target_pattern.unsqueeze(0)
 
-def calculate_quantitative_metrics(pred_patterns: torch.Tensor, target_patterns: torch.Tensor) -> float:
-    """Calculate Quantitative Mean Absolute Error (Quant MAE) in percentage points."""
-    if pred_patterns.dim() == 2:
-        pred_patterns = pred_patterns.unsqueeze(0)
-        target_patterns = target_patterns.unsqueeze(0)
-    pred_intensities = torch.sum(torch.clamp(pred_patterns, min=0), dim=-1)
-    target_intensities = torch.sum(target_patterns, dim=-1)
-    
-    pred_pct = pred_intensities / (pred_intensities.sum(dim=-1, keepdim=True) + 1e-8)
-    target_pct = target_intensities / (target_intensities.sum(dim=-1, keepdim=True) + 1e-8)
-    
-    mae = torch.abs(pred_pct - target_pct).mean().item() * 100
-    return mae
+    pred_mean = pred_pattern.mean(dim=-1, keepdim=True)
+    target_mean = target_pattern.mean(dim=-1, keepdim=True)
+    pred_centered = pred_pattern - pred_mean
+    target_centered = target_pattern - target_mean
+    numerator = (pred_centered * target_centered).sum(dim=-1)
+    pred_std = torch.sqrt((pred_centered ** 2).sum(dim=-1) + 1e-8)
+    target_std = torch.sqrt((target_centered ** 2).sum(dim=-1) + 1e-8)
+    return (numerator / (pred_std * target_std + 1e-8)).mean().item()
 
 def calculate_sisdr(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-8) -> float:
     """Calculate Scale-Invariant Signal-to-Distortion Ratio (SI-SDR) in dB."""
@@ -146,9 +125,9 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
 
     epoch_loss = 0
     metrics_sum = {
-        'rwp': 0, 'sisdr': 0, 'quant_mae': 0, 'top10_acc': 0, 'total_count': 0
+        'pearson_corr': 0, 'si_sdr': 0, 'id_acc_top10': 0, 'total_count': 0
     }
-    
+
     if args.progress_bar:
         pbar = tqdm(total=len(dataloader.dataset), desc=desc, unit='data')
     iters = len(dataloader)
@@ -159,9 +138,9 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
     for i, batch in enumerate(dataloader):
         intensity = batch['intensity'].to(device)
         element = batch['element'].to(device)
-        gt_xrds = batch['gt_xrds'].to(device) 
-        gt_ratios = batch['gt_ratios'].to(device) 
-        gt_ids = batch['gt_ids'].to(device) 
+        gt_xrds = batch['gt_xrds'].to(device)
+        gt_ratios = batch['gt_ratios'].to(device)
+        gt_ids = batch['gt_ids'].to(device)
 
         if mode == 'Train':
             adjust_learning_rate_withWarmup(optimizer, epoch + i / iters, args)
@@ -170,10 +149,10 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                 pred_xrds = outputs['xrds']
                 pred_ratios = outputs['ratios']
                 feat_logits = outputs['feat_logits']
-                
+
                 total_loss = 0
                 batch_size = intensity.size(0)
-                
+
                 for b in range(batch_size):
                     sample_loss, _, _, _ = compute_sample_objective(
                         pred_xrds[b], pred_ratios[b], feat_logits[b],
@@ -194,7 +173,7 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                 pred_xrds = outputs['xrds']
                 pred_ratios = outputs['ratios']
                 feat_logits = outputs['feat_logits']
-                
+
                 total_loss = 0
                 batch_size = intensity.size(0)
                 for b in range(batch_size):
@@ -208,31 +187,22 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
                     if valid_gt_indices.numel() > 0:
                         matched_logits = []
                         matched_targets = []
-                        matched_pred_xrds = []
-                        matched_gt_xrds = []
 
                         for r, c in zip(row_ind, col_ind):
                             gt_idx = valid_gt_indices[c]
-                            metrics_sum['rwp'] += calculate_rwp(pred_xrds[b, r], gt_xrds[b, gt_idx])
-                            metrics_sum['sisdr'] += calculate_sisdr(pred_xrds[b, r], gt_xrds[b, gt_idx])
-                            
-                            matched_pred_xrds.append(pred_xrds[b, r])
-                            matched_gt_xrds.append(gt_xrds[b, gt_idx])
+                            metrics_sum['pearson_corr'] += calculate_pearson_correlation(pred_xrds[b, r], gt_xrds[b, gt_idx])
+                            metrics_sum['si_sdr'] += calculate_sisdr(pred_xrds[b, r], gt_xrds[b, gt_idx])
                             matched_logits.append(feat_logits[b, r])
                             matched_targets.append(gt_ids[b, gt_idx])
                             metrics_sum['total_count'] += 1
-                            
-                        if matched_pred_xrds:
-                            q_mae = calculate_quantitative_metrics(torch.stack(matched_pred_xrds), torch.stack(matched_gt_xrds))
-                            metrics_sum['quant_mae'] += q_mae * len(matched_pred_xrds)
-                        
+
                         if matched_logits:
-                            metrics_sum['top10_acc'] += get_id_acc_topk(torch.stack(matched_logits), torch.stack(matched_targets), k=10) * len(matched_logits)
-                
+                            metrics_sum['id_acc_top10'] += get_id_acc_topk(torch.stack(matched_logits), torch.stack(matched_targets), k=10) * len(matched_logits)
+
                 loss = total_loss / batch_size
 
         epoch_loss += loss.item()
-        
+
         if args.progress_bar:
             pbar.update(len(intensity))
             pbar.set_postfix(loss=f"{loss.item():.4f}")
@@ -243,25 +213,22 @@ def run_one_epoch(model, dataloader, optimizer, epoch, mode):
     # Average metrics
     avg_metrics = {k: (v / metrics_sum['total_count'] if metrics_sum['total_count'] > 0 else 0) for k, v in metrics_sum.items() if k != 'total_count'}
     avg_metrics['loss'] = epoch_loss / iters
-    
-    return avg_metrics
 
+    return avg_metrics
 
 def print_log(epoch: int, train_res: Dict, val_res: Dict, lr: float):
     if rank == 0:
         log.printlog(f'---------------- Epoch {epoch} ----------------')
         log.printlog(f"Loss (Train/Val): {train_res['loss']:.6f} / {val_res['loss']:.6f}")
-        log.printlog(f"RWP (Val):         {val_res['rwp']:.4f}")
-        log.printlog(f"SI-SDR (Val):      {val_res['sisdr']:.2f} dB")
-        log.printlog(f"Quant MAE (Val):   {val_res['quant_mae']:.2f}%")
-        log.printlog(f"Top-10 Acc (Val):  {val_res['top10_acc']*100:.2f}%")
+        log.printlog(f"Pearson (Val):     {val_res['pearson_corr']:.4f}")
+        log.printlog(f"SI-SDR (Val):      {val_res['si_sdr']:.2f} dB")
+        log.printlog(f"ID Top-10 (Val):   {val_res['id_acc_top10']*100:.2f}%")
 
         log.train_writer.add_scalar('loss', train_res['loss'], epoch)
         log.val_writer.add_scalar('loss', val_res['loss'], epoch)
-        log.val_writer.add_scalar('rwp', val_res['rwp'], epoch)
-        log.val_writer.add_scalar('sisdr', val_res['sisdr'], epoch)
-        log.val_writer.add_scalar('quant_mae', val_res['quant_mae'], epoch)
-        log.val_writer.add_scalar('top10_acc', val_res['top10_acc'], epoch)
+        log.val_writer.add_scalar('pearson_corr', val_res['pearson_corr'], epoch)
+        log.val_writer.add_scalar('si_sdr', val_res['si_sdr'], epoch)
+        log.val_writer.add_scalar('id_acc_top10', val_res['id_acc_top10'], epoch)
         log.train_writer.add_scalar('lr', lr, epoch)
 
 def save_checkpoint(state, is_best: bool, filepath: str, filename: str):
@@ -295,19 +262,19 @@ def main():
         log.printlog(model)
 
     # Updated to use the new ASEDataset with ID-based splitting
-    trainset = ASEDataset(args.db_path, args.npz_dir, mode='train', 
+    trainset = ASEDataset(args.db_path, args.npz_dir, mode='train',
                           encode_element=args.atom_embed, num_classes=args.num_classes)
-    valset = ASEDataset(args.db_path, args.npz_dir, mode='val', 
+    valset = ASEDataset(args.db_path, args.npz_dir, mode='val',
                         encode_element=args.atom_embed, num_classes=args.num_classes)
 
     if distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(trainset, shuffle=True)
         val_sampler = torch.utils.data.distributed.DistributedSampler(valset, shuffle=False)
-    
+
         train_loader = DataLoader(trainset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, drop_last=True, sampler=train_sampler)
         val_loader = DataLoader(valset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, drop_last=False, sampler=val_sampler)
 
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)  
+        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
     else:
         train_loader = DataLoader(trainset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=True)
         val_loader = DataLoader(valset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, shuffle=False)
@@ -316,7 +283,7 @@ def main():
     scaler = torch.cuda.amp.GradScaler()
     start_epoch = 0
 
-    # 早停止相关变量
+    # Early stopping state
     best_loss = float('inf')
     epochs_no_improve = 0
     early_stop = False
@@ -339,14 +306,14 @@ def main():
                             filepath=f'{log.get_path()}/checkpoints/',
                             filename=f'checkpoint_{epoch:04d}.pth')
 
-            # 检查验证集损失是否有改善
+            # Check validation loss
             if loss_val < best_loss:
                 best_loss = loss_val
                 epochs_no_improve = 0
             else:
                 epochs_no_improve += 1
 
-            # 检查是否需要早停止
+            # Stop if patience is exhausted
             if epochs_no_improve >= patience:
                 print(f"Early stopping at epoch {epoch}")
                 early_stop = True
@@ -361,7 +328,7 @@ if __name__ == '__main__':
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
         rank = int(os.environ["RANK"])
         local_rank = int(os.environ["LOCAL_RANK"])
-        
+
         if torch.cuda.is_available():
             torch.cuda.set_device(rank % torch.cuda.device_count())
             device = torch.device("cuda", local_rank)
@@ -370,7 +337,7 @@ if __name__ == '__main__':
         else:
             device = torch.device("cpu")
             dist.init_process_group(backend="gloo")
-        
+
         distributed = True
     else:
         if torch.cuda.is_available():
@@ -378,7 +345,7 @@ if __name__ == '__main__':
         else:
             device = torch.device("cpu")
 
-    # 设置环境变量以获取详细调试信息
+    # Enable verbose debugging
     os.environ['TORCH_DISTRIBUTED_DEBUG'] = 'DETAIL'
 
     parser = argparse.ArgumentParser()
@@ -388,9 +355,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', default=16, type=int, metavar='N')
     parser.add_argument('--warmup_epochs', default=20, type=int, metavar='N', help='number of warmup epochs')
     parser.add_argument('--lr', '--learning-rate', default=8e-5, type=float, metavar='LR', help='initial (base) learning rate', dest='lr')
-    parser.add_argument('--db_path', default='/data/group/project1/Crystal/UniqCryLabeled.db', type=str,
+    parser.add_argument('--db_path', default='data/UniqCryLabeled.db', type=str,
                         help='Path to the metadata .db file')
-    parser.add_argument('--npz_dir', default='/data/group/project1/Crystal/UniqCry', type=str,
+    parser.add_argument('--npz_dir', default='data/UniqCry', type=str,
                         help='Directory containing the XRD .npz files')
     parser.add_argument('--atom_embed', type=lambda x: (str(x).lower() in ['true','1']), default=True)
     parser.add_argument('--num_classes', default=100315, type=int, metavar='N')

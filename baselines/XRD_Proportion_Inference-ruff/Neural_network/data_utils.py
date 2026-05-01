@@ -31,13 +31,13 @@ def baseline_als(y, lam=1e5, p=0.01, niter=10):
 class RRUFFOnlineMixingDataset(data.Dataset):
     """
     Dataset for online mixing of single-phase XRD patterns from the RRUFF database.
-    
+
     This dataset dynamically creates multiphase XRD patterns by mixing single-phase
     patterns on-the-fly. It handles data loading, preprocessing (baseline correction,
     interpolation, normalization), and k-fold splitting.
     """
-    def __init__(self, rruff_db_path, min_k=2, max_k=4, k_weights=None, min_weight=0.1, 
-                 weight_distribution="random", target_length=3500, theta_min=10.0, 
+    def __init__(self, rruff_db_path, min_k=2, max_k=4, k_weights=None, min_weight=0.1,
+                 weight_distribution="random", target_length=3500, theta_min=10.0,
                  theta_max=80.0, split='all', num_folds=5, fold=0, seed=42):
         """
         Args:
@@ -63,10 +63,10 @@ class RRUFFOnlineMixingDataset(data.Dataset):
         self.weight_distribution = weight_distribution
         self.target_length = target_length
         self.target_angles = np.linspace(theta_min, theta_max, target_length)
-        
+
         # Load all valid phase data into memory
         self.phases = []  # List of (id, rruff_id, intensity_array)
-        
+
         # Fast load from preprocessed directory if it exists
         preprocessed_dir = os.path.join(os.path.dirname(rruff_db_path), "rruff_processed")
         if os.path.isdir(preprocessed_dir):
@@ -75,13 +75,13 @@ class RRUFFOnlineMixingDataset(data.Dataset):
         else:
             print("Processing from standard Database (This will take a while for ALS baseline removal)...")
             self._load_db()
-            
+
         print(f"Loaded {len(self.phases)} total valid XRD patterns from RRUFF before splitting.")
-        
+
         # Perform K-Fold Split if not using all data
         if split != 'all':
             self._perform_kfold_split(split, num_folds, fold, seed)
-        
+
     def _load_preprocessed(self, prep_dir):
         """Loads pre-processed and cached .npz files."""
         npz_files = glob.glob(os.path.join(prep_dir, "rruff_*.npz"))
@@ -98,7 +98,7 @@ class RRUFFOnlineMixingDataset(data.Dataset):
         """Loads data from the ASE database, performs preprocessing, and caches results."""
         from ase.db import connect
         db = connect(self.rruff_db_path)
-        
+
         # Prepare cache directory
         preprocessed_dir = os.path.join(os.path.dirname(self.rruff_db_path), "rruff_processed")
         os.makedirs(preprocessed_dir, exist_ok=True)
@@ -108,11 +108,11 @@ class RRUFFOnlineMixingDataset(data.Dataset):
             data_dict = row.data
             if not data_dict or "angle" not in data_dict or "intensity" not in data_dict:
                 continue
-            
+
             try:
                 angles = np.array(data_dict["angle"])
                 intensities = np.array(data_dict["intensity"])
-                
+
                 # 1. Baseline Correction
                 try:
                     baseline = baseline_als(intensities)
@@ -128,10 +128,10 @@ class RRUFFOnlineMixingDataset(data.Dataset):
                 # 3. Normalization
                 if std_intensities.max() > 0:
                     std_intensities = std_intensities / std_intensities.max()
-                    
+
                 rruff_id = row.get("rruff_id", f"ID_{s_id}")
                 self.phases.append((s_id, rruff_id, std_intensities.astype(np.float32)))
-                
+
                 # 4. Cache the processed pattern
                 np.savez_compressed(os.path.join(preprocessed_dir, f"rruff_{s_id}.npz"), y=std_intensities)
 
@@ -142,21 +142,21 @@ class RRUFFOnlineMixingDataset(data.Dataset):
         """Splits the data into train/validation sets for k-fold cross-validation."""
         # Sort phases by ID to ensure determinism
         self.phases.sort(key=lambda x: x[0])
-        
+
         rng = random.Random(seed)
         indices = list(range(len(self.phases)))
         rng.shuffle(indices)
-        
+
         fold_size = len(indices) // num_folds
         val_start = fold * fold_size
         val_end = (fold + 1) * fold_size if fold < num_folds - 1 else len(indices)
         val_indices = set(indices[val_start:val_end])
-        
+
         if split == 'train':
             self.phases = [self.phases[i] for i in range(len(self.phases)) if i not in val_indices]
         elif split in ['val', 'test']:
             self.phases = [self.phases[i] for i in range(len(self.phases)) if i in val_indices]
-            
+
         print(f"[{split.upper()} Fold {fold+1}/{num_folds}] Using {len(self.phases)} base patterns for mixing.")
 
     def __len__(self):
@@ -171,10 +171,10 @@ class RRUFFOnlineMixingDataset(data.Dataset):
             k = random.choices(range(self.min_k, self.max_k + 1), weights=self.k_weights, k=1)[0]
         else:
             k = random.randint(self.min_k, self.max_k)
-            
+
         # 2. Sample k phases from the available pool
         chosen_phases = random.sample(self.phases, k)
-        
+
         # 3. Generate weights for the mixture
         if self.weight_distribution == "equal":
             weights = np.ones(k) / k
@@ -186,30 +186,30 @@ class RRUFFOnlineMixingDataset(data.Dataset):
             else:
                 raw_weights = np.random.dirichlet(np.ones(k))
                 weights = raw_weights * rem + self.min_weight
-        
+
         # 4. Mix the patterns
         mixed_intensity = np.zeros(self.target_length, dtype=np.float32)
         base_intensities = []
         base_ids = []
-        
+
         for i, (p_id, r_id, p_intensity) in enumerate(chosen_phases):
             weighted_intensity = weights[i] * p_intensity
             mixed_intensity += weighted_intensity
             base_intensities.append(weighted_intensity)
             base_ids.append(p_id)
-            
+
         # 5. Normalize the final mixture and its components
         if mixed_intensity.max() > 0:
             scale = mixed_intensity.max()
             mixed_intensity /= scale
             base_intensities = [b / scale for b in base_intensities]
-            
+
         # 6. Pad to max_k for consistent tensor shapes
         while len(base_intensities) < self.max_k:
             base_intensities.append(np.zeros_like(mixed_intensity))
             base_ids.append(-1) # Use -1 as a sentinel for non-existent phases
             weights = np.append(weights, 0.0)
-            
+
         return {
             'multiphase_xrd': torch.from_numpy(mixed_intensity).unsqueeze(0),
             'single_xrds': torch.from_numpy(np.stack(base_intensities)),
@@ -221,26 +221,26 @@ class RRUFFOnlineMixingDataset(data.Dataset):
 
 def get_dataloaders(rruff_db_path, config, batch_size=32, num_workers=4, num_folds=5, fold=0):
     """Creates Train, Val, and Test dataloaders for K-Fold CV."""
-    
+
     train_dataset = RRUFFOnlineMixingDataset(
-        rruff_db_path, min_k=config.MIN_K, max_k=config.MAX_K, 
+        rruff_db_path, min_k=config.MIN_K, max_k=config.MAX_K,
         min_weight=config.MIN_WEIGHT, target_length=config.XRD_LENGTH,
         split='train', num_folds=num_folds, fold=fold, seed=config.SEED
     )
-    
+
     val_dataset = RRUFFOnlineMixingDataset(
-        rruff_db_path, min_k=config.MIN_K, max_k=config.MAX_K, 
+        rruff_db_path, min_k=config.MIN_K, max_k=config.MAX_K,
         min_weight=config.MIN_WEIGHT, target_length=config.XRD_LENGTH,
         split='val', num_folds=num_folds, fold=fold, seed=config.SEED
     )
-    
+
     # test dataset is same as val in K-fold CV unless we have a separate holdout
     test_dataset = val_dataset
-    
+
     train_loader = data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader = data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    
+
     return train_loader, val_loader, test_loader
 
 # Configuration dummy to match previous code

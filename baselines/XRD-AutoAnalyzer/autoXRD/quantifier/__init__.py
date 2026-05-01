@@ -17,7 +17,6 @@ import numpy as np
 import math
 import os
 
-
 class QuantAnalysis(object):
     """
     Class used to plot and compare:
@@ -235,7 +234,6 @@ class QuantAnalysis(object):
         norm_signal = 100 * signal / max(signal)
 
         return norm_signal
-
 
     def convert_angle(self, angle):
         """
@@ -474,7 +472,6 @@ class QuantAnalysis(object):
 
         return best_scale
 
-
 def get_max_intensity(ref_phase, min_angle, max_angle, ref_dir='References'):
     """
     Returns:
@@ -541,7 +538,7 @@ def main(spectra_directory, spectrum_fname, predicted_phases, scale_factors, min
             for ph in predicted_phases:
                 ph_name = ph[:-4]
                 weights.append(weight_dict[ph_name])
-                
+
                 if refined_phases_dir:
                     os.makedirs(f"{refined_phases_dir}/{spectrum_fname}", exist_ok=True)
                     structure = get_structure(result["lst_data"]["phases_results"][ph_name])

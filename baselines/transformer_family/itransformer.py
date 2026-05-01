@@ -11,7 +11,6 @@ from torch import Tensor
 from .base import BaselineBase
 from .backbone import PretrainedXRDBackbone
 
-
 class ITransformerBaseline(BaselineBase):
     """Treat MAE latent channels as variate tokens and model them with self-attention."""
 

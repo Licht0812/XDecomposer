@@ -18,9 +18,9 @@ def main():
     print(f"Loading training data from {TRAIN_DATA_PATH}...", flush=True)
     # data is a list of lists: N_classes x M_aug x 4501
     xrd_specs = np.load(TRAIN_DATA_PATH, allow_pickle=True)
-    
+
     print(f"Loaded {len(xrd_specs)} classes.", flush=True)
-    
+
     # Train the model
     # Note: autoXRD.cnn.main handles splitting and training
     print(f"Starting training for {NUM_EPOCHS} epochs...", flush=True)

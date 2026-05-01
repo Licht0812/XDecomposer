@@ -8,7 +8,6 @@ from torch import Tensor
 
 from .backbone import PretrainedXRDBackbone, unpatchify_1d
 
-
 class BaselineBase(nn.Module):
     def __init__(
         self,

@@ -11,14 +11,12 @@ import ase
 from ase import Atoms
 import spglib
 
-
-
 def get_acc(cls, rruff_id):
     """
     Calculate the accuracy of the classification model.
 
     Parameters:
-    - cls: Predictions from the classification model, shape (N, C), 
+    - cls: Predictions from the classification model, shape (N, C),
            where N is the number of samples and C is the number of classes.
     - rruff_id: Material IDs from the RRUFF database, shape (N,).
 
@@ -40,11 +38,9 @@ def get_acc(cls, rruff_id):
 def run_one_epoch(model, dataloader, device):
     model.eval()
 
-
     correct_cnt, total_cnt = 0, 0
     pbar = tqdm(total=len(dataloader.dataset), desc='Evaluating... ', unit='data')
     iters = len(dataloader)
-   
 
     for batch in dataloader:
         intensity = batch['intensity'].to(device)
@@ -64,7 +60,6 @@ def run_one_epoch(model, dataloader, device):
 
     pbar.close()
     return correct_cnt, total_cnt
-
 
 def prim2conv(prim_atom):
     """
@@ -87,7 +82,6 @@ def prim2conv(prim_atom):
     lmtx = conventional_atoms.get_cell()[:]
     return lc, lmtx, conventional_atoms
 
-
 def check_match_num(mp_id, rf_id):
     """
     Compare materials from the Materials Project (MP) and RRUFF databases,
@@ -106,7 +100,7 @@ def check_match_num(mp_id, rf_id):
     for i in range(len(mp_id)):
         _mpid = int(mp_id[i])
         _rfid = int(rf_id[i])
-        
+
         # Retrieve atomic information from the RRUFF database
         rruff_atoms = ase.db.connect(args.data_dir[0]).get_atoms(id=_rfid)
         rf_latt_consts, _, rf_c_atom = prim2conv(rruff_atoms)
@@ -122,7 +116,7 @@ def check_match_num(mp_id, rf_id):
         try:
             # Check if the number of atoms, lattice constants, and elemental composition match
             if (
-                
+
                 all(mp_latt_consts[i] * 0.95 <= rf_latt_consts[i] <= mp_latt_consts[i] * 1.05 for i in range(6))
                 and rruff_element == mp_element
             ):
@@ -133,8 +127,6 @@ def check_match_num(mp_id, rf_id):
             pass
 
     return cnt
-
-
 
 def main():
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
@@ -153,16 +145,14 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', default='cuda:0', type=str, choices=['cuda:0', 'cpu'])
-    parser.add_argument('--data_dir', default=['/data/cb_dataset/RRUFF.db'], type=str)
-    parser.add_argument('--mp_dir', default=['/data/cb_dataset/mpdata.db'], type=str)
+    parser.add_argument('--data_dir', default=['data/RRUFF.db'], type=str)
+    parser.add_argument('--mp_dir', default=['data/mpdata.db'], type=str)
     parser.add_argument('--num_workers', default=16, type=int)
     parser.add_argument('--atom_embed', default=True, type=bool)
-    parser.add_argument('--load_path', default='/home/cb/XRDS/XQueryer/output/2024-08-09_1444/checkpoints/checkpoint_0010.pth', type=str,
+    parser.add_argument('--load_path', default='checkpoints/xqueryer/latest.pth', type=str,
                         help='Path to load pretrained single-phase identification model')
     parser.add_argument('--num_classes', default=100315, type=int)
 
     args = parser.parse_args()
     main()
     print('THE END')
-
-

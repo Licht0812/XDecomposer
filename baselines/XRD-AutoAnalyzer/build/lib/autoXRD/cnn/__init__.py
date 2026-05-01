@@ -22,7 +22,6 @@ class CustomDropout(tf.keras.layers.Layer):
     def call(self, inputs, training=None):
         return tf.nn.dropout(inputs, rate=self.rate)
 
-
 class DataSetUp(object):
     """
     Class used to train a convolutional neural network on a given

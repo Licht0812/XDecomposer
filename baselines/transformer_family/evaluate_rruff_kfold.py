@@ -26,7 +26,6 @@ if PROJECT_ROOT not in sys.path:
 from baselines.transformer_family.evaluate import (  # noqa: E402
     align_predictions,
     calculate_identification_topk,
-    calculate_quant_mae,
     pad_sources,
     strip_module_prefix,
 )
@@ -35,12 +34,10 @@ from baselines.transformer_family.models import build_transformer_family_baselin
 from src.data.rruff_dataset import baseline_als, create_rruff_dataloader  # noqa: E402
 from src.utils.metrics import calculate_separation_metrics, calculate_sisdr  # noqa: E402
 
-
 def autocast_context(device: torch.device):
     if device.type == "cuda":
         return torch.amp.autocast("cuda")
     return nullcontext()
-
 
 def ensure_rruff_cache(
     rruff_db_path: str,
@@ -95,7 +92,6 @@ def ensure_rruff_cache(
     print(f"RRUFF cache ready: wrote {written} npz files to {cache_dir}.", flush=True)
     return cache_dir
 
-
 def build_rruff_reference_bank(dataset, device: torch.device):
     """Build retrieval bank from the current RRUFF fold split."""
     ref_patterns = []
@@ -113,7 +109,6 @@ def build_rruff_reference_bank(dataset, device: torch.device):
 
     return torch.stack(ref_patterns).to(device), torch.tensor(ref_ids, dtype=torch.long, device=device)
 
-
 def evaluate_fold(model, loader, device: torch.device, args: argparse.Namespace) -> Dict[str, float]:
     model.eval()
     ref_bank = ref_ids = None
@@ -123,19 +118,11 @@ def evaluate_fold(model, loader, device: torch.device, args: argparse.Namespace)
     accumulated = {
         "loss": 0.0,
         "si_sdr": 0.0,
-        "rwp": 0.0,
         "pearson_corr": 0.0,
         "sir": 0.0,
         "sar": 0.0,
         "delta_2theta": 0.0,
         "fwhm_error": 0.0,
-        "intensity_consistency": 0.0,
-        "act_acc": 0.0,
-        "act_f1": 0.0,
-        "act_precision": 0.0,
-        "act_recall": 0.0,
-        "act_exact_match": 0.0,
-        "quant_mae": 0.0,
         **{f"id_acc_top{k}": 0.0 for k in range(1, 11)},
     }
     steps = 0
@@ -156,7 +143,6 @@ def evaluate_fold(model, loader, device: torch.device, args: argparse.Namespace)
                 sep_loss, best_perms = calculate_pit_loss(preds, targets)
 
             aligned_preds = align_predictions(preds, best_perms)
-            inv_perms = torch.argsort(best_perms, dim=1)
             metrics = calculate_separation_metrics(
                 aligned_preds,
                 targets,
@@ -166,17 +152,6 @@ def evaluate_fold(model, loader, device: torch.device, args: argparse.Namespace)
 
             target_energy = (targets**2).sum(dim=-1)
             target_is_active = (target_energy > 1e-6).float()
-            aligned_act_logits = torch.gather(activity_logits, 1, inv_perms)
-            act_pred = (torch.sigmoid(aligned_act_logits) > args.activity_threshold).float()
-
-            tp = (act_pred * target_is_active).sum()
-            fp = (act_pred * (1 - target_is_active)).sum()
-            fn = ((1 - act_pred) * target_is_active).sum()
-            precision = (tp / (tp + fp + 1e-8)).item()
-            recall = (tp / (tp + fn + 1e-8)).item()
-            f1 = (2 * tp / (2 * tp + fp + fn + 1e-8)).item()
-            acc = (act_pred == target_is_active).float().mean().item()
-            exact = (act_pred == target_is_active).all(dim=1).float().mean().item()
 
             id_metrics = {f"id_acc_top{k}": 0.0 for k in range(1, 11)}
             if ref_bank is not None and ref_ids is not None:
@@ -190,25 +165,16 @@ def evaluate_fold(model, loader, device: torch.device, args: argparse.Namespace)
 
             accumulated["loss"] += sep_loss.item()
             accumulated["si_sdr"] += calculate_sisdr(aligned_preds, targets)
-            accumulated["rwp"] += metrics["rwp"]
             accumulated["pearson_corr"] += metrics["pearson_corr"]
             accumulated["sir"] += metrics["sir"]
             accumulated["sar"] += metrics["sar"]
             accumulated["delta_2theta"] += metrics["delta_2theta"]
             accumulated["fwhm_error"] += metrics["fwhm_error"]
-            accumulated["intensity_consistency"] += metrics["intensity_ratio_consistency"]
-            accumulated["act_acc"] += acc
-            accumulated["act_f1"] += f1
-            accumulated["act_precision"] += precision
-            accumulated["act_recall"] += recall
-            accumulated["act_exact_match"] += exact
-            accumulated["quant_mae"] += calculate_quant_mae(aligned_preds, targets)
             for key, value in id_metrics.items():
                 accumulated[key] += value
             steps += 1
 
     return {key: value / max(1, steps) for key, value in accumulated.items()}
-
 
 def summarize(metrics: list[Dict[str, float]]) -> Dict[str, Dict[str, float]]:
     metadata_keys = {"k", "fold", "num_folds", "virtual_epoch_length"}
@@ -225,7 +191,6 @@ def summarize(metrics: list[Dict[str, float]]) -> Dict[str, Dict[str, float]]:
             "std": float(values.std(ddof=1)) if len(values) > 1 else 0.0,
         }
     return summary
-
 
 def load_model(args: argparse.Namespace):
     print(f"Loading checkpoint: {args.checkpoint}", flush=True)
@@ -264,10 +229,8 @@ def load_model(args: argparse.Namespace):
     model.load_state_dict(strip_module_prefix(ckpt["model_state_dict"]))
     return model, config, baseline_name, num_phases, xrd_length
 
-
 def parse_int_list(values: Iterable[int] | None, default: list[int]) -> list[int]:
     return list(values) if values is not None else default
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate Transformer-family baselines on RRUFF k-fold splits")
@@ -296,7 +259,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip_rruff_cache_build", action="store_true")
     parser.add_argument("--quick", action="store_true")
     return parser.parse_args()
-
 
 def main() -> None:
     args = parse_args()
@@ -339,17 +301,6 @@ def main() -> None:
             )
             print(f"Fold dataloader: {len(loader.dataset)} samples, {len(loader)} batches.", flush=True)
             metrics = evaluate_fold(model, loader, device, args)
-            metrics.update(
-                {
-                    "baseline_name": baseline_name,
-                    "checkpoint": args.checkpoint,
-                    "rruff_db": args.rruff_db,
-                    "k": k,
-                    "fold": fold,
-                    "num_folds": args.num_folds,
-                    "virtual_epoch_length": args.virtual_epoch_length,
-                }
-            )
             k_metrics.append(metrics)
             all_fold_metrics.append(metrics)
 
@@ -362,33 +313,18 @@ def main() -> None:
 
     overall_summary = summarize(all_fold_metrics)
     payload = {
-        "config": {
-            "baseline_name": baseline_name,
-            "checkpoint": args.checkpoint,
-            "rruff_db": args.rruff_db,
-            "k_values": args.k_values,
-            "folds": fold_ids,
-            "num_folds": args.num_folds,
-            "virtual_epoch_length": args.virtual_epoch_length,
-            "batch_size": args.batch_size,
-            "seed": args.seed,
-            "device": str(device),
-            "identification_enabled": not args.disable_identification,
-        },
         "per_k_mean_std": per_k_summary,
         "overall_mean_std": overall_summary,
-        "fold_metrics": all_fold_metrics,
     }
     summary_path = os.path.join(args.save_dir, "rruff_kfold_mean_std.json")
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=4)
 
-    print(f"RRUFF k-fold summary saved to {summary_path}", flush=True)
-    for metric in ("loss", "pearson_corr", "rwp", "si_sdr", "id_acc_top1", "id_acc_top10"):
+    print("RRUFF k-fold summary saved.", flush=True)
+    for metric in ("loss", "pearson_corr", "si_sdr", "id_acc_top1", "id_acc_top10"):
         if metric in overall_summary:
             item = overall_summary[metric]
             print(f"overall {metric}: {item['mean']:.4f} ± {item['std']:.4f}", flush=True)
-
 
 if __name__ == "__main__":
     main()

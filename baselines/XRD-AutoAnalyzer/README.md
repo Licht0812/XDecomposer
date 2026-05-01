@@ -22,7 +22,7 @@ cd XRD-AutoAnalyzer/
 pip install --user .
 ```
 
-Note that in both cases, the ```--user``` argument is important to ensure proper installation of the Rietveld refinement capabilities. 
+Note that in both cases, the ```--user``` argument is important to ensure proper installation of the Rietveld refinement capabilities.
 
 ## Usage example
 
@@ -68,9 +68,9 @@ python construct_xrd_model.py --min_angle=10.0 --max_angle=80.0
 
 Different X-ray wavelengths may also be considered, but this should only be specified at inference. All patterns will be converted back to Cu K-alpha.
 
-The model creation process may require a substantial amount of computational resources depending on the size of the composition space considered. For example: performing all necessary steps to create a model in the Li-Mn-Ti-O-F space, which included 255 reference phases, required about 4 hours of computational runtime on a single core. Required computational time should scale linearly with the number of reference phases. Similarily, time is reduced linearly with the number of cores used as all processes executed here are perfectly parallel (independent of one another).
+The model creation process may require a substantial amount of computational resources depending on the size of the composition space considered. For example: performing all necessary steps to create a model in the Li-Mn-Ti-O-F space, which included 255 reference phases, required about 4 hours of computational runtime on a single core. Required computational time should scale linearly with the number of reference phases. Similarly, time is reduced linearly with the number of cores used because the processes executed here are independent of one another.
 
-When the procedure is completed, a trained ```Model.h5``` file will be made available. 
+When the procedure is completed, a trained ```Model.h5``` file will be made available.
 
 By default, the following bounds are used on artifacts included during data augmentation:
 
@@ -210,4 +210,3 @@ python run_CNN.py --inc_pdf --show_indiv
 ```
 
 All other runtime arguments described in the previous section hold for PDF analysis.
-

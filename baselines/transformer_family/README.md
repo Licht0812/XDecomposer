@@ -56,26 +56,26 @@ submitted on the Linux A100 cluster with Slurm. GPU and node counts are controll
 `sbatch`, not by hardcoded `#SBATCH -N` / `#SBATCH --gres` inside the script:
 
 ```bash
-sbatch -N 1 --gres=gpu:2 -p project1 -A project1 baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20
+sbatch -N 1 --gres=gpu:2 -p your-partition -A your-account baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20
 ```
 
 For 1 node with 8 A100 GPUs:
 
 ```bash
-sbatch -N 1 --gres=gpu:8 -p project1 -A project1 baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20_8gpu
+sbatch -N 1 --gres=gpu:8 -p your-partition -A your-account baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20_8gpu
 ```
 
 For 2 nodes with 8 A100 GPUs per node:
 
 ```bash
-sbatch -N 2 --gres=gpu:8 -p project1 -A project1 baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20_2node
+sbatch -N 2 --gres=gpu:8 -p your-partition -A your-account baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20_2node
 ```
 
-If your account is bound to a sub-partition such as `project1-1`, override the Slurm options
+If your account is bound to a sub-partition such as `your-partition-1`, override the Slurm options
 at submission time:
 
 ```bash
-sbatch -N 1 --gres=gpu:2 -p project1-1 -A project1 baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20
+sbatch -N 1 --gres=gpu:2 -p your-partition-1 -A your-account baselines/transformer_family/train.sh --baseline transformer --name transformer_mp20
 ```
 
 The training script follows the A100 cluster manual:

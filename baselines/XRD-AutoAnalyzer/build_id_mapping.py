@@ -21,10 +21,10 @@ def get_structure_from_db(cur, cid):
 def build_mapping(db_path, ref_dir, sample_ids):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    
+
     id_to_label = {}
     print(f"Building mapping for {len(sample_ids)} unique IDs...")
-    
+
     for cid in tqdm(sample_ids):
         struc = get_structure_from_db(cur, cid)
         if struc:
@@ -47,7 +47,7 @@ for l in labels:
     for cid in l:
         unique_ids.add(cid)
 
-db_path = '/data/group/project1/Crystal/UniqCryLabeled.db'
+db_path = 'data/UniqCryLabeled.db'
 ref_dir = 'Novel-Space/References'
 mapping = build_mapping(db_path, ref_dir, list(unique_ids))
 

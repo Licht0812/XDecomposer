@@ -8,7 +8,6 @@ import numpy as np
 import math
 import os
 
-
 class SpectraGenerator(object):
     """
     Class used to generate augmented xrd spectra
@@ -89,25 +88,25 @@ class SpectraGenerator(object):
                 # result is (patterns, filename)
                 # patterns is a list of augmented spectra (e.g. 1 or 5 spectra)
                 # each spectrum is a list/array of 4501 values
-                
+
                 # Convert to float32 immediately to save 50% memory vs float64
                 patterns = np.array(result[0], dtype=np.float32)
                 grouped_xrd.append((patterns, result[1]))
-                
+
                 if i % 100 == 0 or i == total_phases:
                     print(f"  Progress: {i}/{total_phases} phases processed...", flush=True)
 
             print("Sorting and finalizing augmented spectra...")
             sorted_xrd = sorted(grouped_xrd, key=lambda x: x[1]) ## Sort by filename
-            
+
             # Extract only the patterns and convert to final numpy array
             # Use float32 to save memory
             sorted_spectra = np.array([group[0] for group in sorted_xrd], dtype=np.float32)
-            
+
             # Explicitly clear intermediate list
             del grouped_xrd
             del sorted_xrd
-            
+
             return sorted_spectra
 
     def XRDtoPDF(self, xrd, min_angle, max_angle):

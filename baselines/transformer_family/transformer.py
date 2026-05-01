@@ -11,7 +11,6 @@ from torch import Tensor
 from .base import BaselineBase
 from .backbone import PretrainedXRDBackbone
 
-
 class TransformerBaseline(BaselineBase):
     """MAE encoder memory + learned source/patch queries + direct source decoder."""
 

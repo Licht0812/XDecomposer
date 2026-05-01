@@ -27,7 +27,6 @@ from tqdm import tqdm
 with open(Path(__file__).parent / "data" / "possible_species.txt") as f:
     POSSIBLE_SPECIES = {sp.strip() for sp in f}
 
-
 def do_refinement(
         pattern_path: Path | str,
         phase_paths: list[Path | str],
@@ -74,7 +73,6 @@ def do_refinement(
     except Exception as e:
         raise RuntimeError(f"Error in BGMN refinement for {control_file_path}") from e
 
-
 def do_refinement_no_saving(
         pattern_path: Path | str,
         phase_paths: list[Path | str],
@@ -93,7 +91,6 @@ def do_refinement_no_saving(
             phase_params=phase_params,
             refinement_params=refinement_params,
         )
-
 
 class BGMNWorker:
     def __init__(self):
@@ -132,10 +129,8 @@ class BGMNWorker:
                 f"{cp.stderr}"
             )
 
-
 class CIF2StrError(Exception):
     pass
-
 
 def process_specie_string(sp: str | Specie | Element | DummySpecie) -> str:
     specie = re.sub(r"(\d+)([+-])", r"\2\1", str(sp))
@@ -151,7 +146,6 @@ def process_specie_string(sp: str | Specie | Element | DummySpecie) -> str:
                 f"Unknown species {specie}, the original specie string is {sp}"
             )
     return specie
-
 
 def get_lattice_parameters_from_lattice(
         lattice: Lattice,
@@ -210,7 +204,6 @@ def get_lattice_parameters_from_lattice(
 
     raise CIF2StrError(f"Unknown crystal system {crystal_system}")
 
-
 def get_std_position(
         spacegroup_setting: dict[str, Any],
         wyckoff_letter: str,
@@ -243,7 +236,6 @@ def get_std_position(
             ):
                 return position, True
     return positions[0], False
-
 
 def check_wyckoff(
         spacegroup_setting: dict[str, Any], structure: SymmetrizedStructure
@@ -289,12 +281,10 @@ def check_wyckoff(
 
     return element_settings, error_count
 
-
 def make_spacegroup_setting_str(spacegroup_setting: dict[str, Any]) -> str:
     return (
             " ".join([f"{k}={v}" for k, v in spacegroup_setting["setting"].items()]) + " //"
     )
-
 
 def make_lattice_parameters_str(
         spacegroup_setting: dict[str, Any],
@@ -315,7 +305,6 @@ def make_lattice_parameters_str(
     lattice_parameters_str += " //"
     return lattice_parameters_str
 
-
 def make_peak_parameter_str(k1: str, k2: str, b1: str, gewicht: str, rp: int) -> str:
     return (
             f"RP={rp} "
@@ -324,7 +313,6 @@ def make_peak_parameter_str(k1: str, k2: str, b1: str, gewicht: str, rp: int) ->
             + (f"PARAM=B1={b1} " if b1 != "fixed" else "B1=0 ")
             + (f"GEWICHT={gewicht} //" if gewicht != "0_0" else "PARAM=GEWICHT=0_0 //")
     )
-
 
 def cif2str(
         cif_path: Path,
@@ -400,19 +388,16 @@ def cif2str(
 
     return str_path
 
-
 def copy_instrument_files(instrument_name: str, working_dir: Path) -> None:
     instrument_path = Path(__file__).parent / "data" / "BGMN-Templates" / "Devices"
 
     for file in instrument_path.glob(f"{instrument_name}*"):
         shutil.copy(file, working_dir)
 
-
 def copy_xy_pattern(pattern_path: Path, working_dir: Path) -> Path:
     if pattern_path.parent != working_dir:
         shutil.copy(pattern_path, working_dir)
     return working_dir / pattern_path.name
-
 
 def generate_control_file(
         pattern_path: Path,
@@ -481,7 +466,6 @@ def generate_control_file(
 
     return control_file_path
 
-
 def get_result(control_file: Path):
     lst_path = control_file.parent / f"{control_file.stem}.lst"
     dia_path = control_file.parent / f"{control_file.stem}.dia"
@@ -495,7 +479,6 @@ def get_result(control_file: Path):
     }
 
     return result
-
 
 def parse_lst(lst_path: Path, phase_names: list[str]):
     def parse_values(v_: str) -> Union[float, tuple[float, float], None, str, int]:
@@ -575,7 +558,6 @@ def parse_lst(lst_path: Path, phase_names: list[str]):
         result["phases_results"][phase_name]["atom_positions_string"] = atom_section
 
     return result
-
 
 def get_structure(phase_result: dict) -> Structure:
     """
@@ -676,7 +658,6 @@ def get_structure(phase_result: dict) -> Structure:
         coords=all_coords,
     )
 
-
 def parse_dia(dia_path: Path, phase_names: list[str]):
     if not dia_path.exists():
         raise FileNotFoundError(f"Cannot find the .dia file from {dia_path}")
@@ -696,7 +677,6 @@ def parse_dia(dia_path: Path, phase_names: list[str]):
 
     return data
 
-
 def get_phase_weights(result, normalize=True) -> dict[str, float]:
     weights = {}
     for phase, data in result["lst_data"]["phases_results"].items():
@@ -707,11 +687,9 @@ def get_phase_weights(result, normalize=True) -> dict[str, float]:
         weights = {k: v / tot for k, v in weights.items()}
     return dict(sorted(weights.items(), key=lambda item: item[1], reverse=True))
 
-
 def process_phase_name(phase_name: str) -> str:
     """Process the phase name to remove special characters."""
     return re.sub(r"[\s()_/\\+–\-*.]", "", phase_name)
-
 
 def get_number(s: Union[float, None, tuple[float, float]]) -> Union[float, None]:
     """Get the number from a float or tuple of floats."""
@@ -721,7 +699,6 @@ def get_number(s: Union[float, None, tuple[float, float]]) -> Union[float, None]
         return float(re.search(r"(\d+\.\d+)", s).group(1))
     else:
         return s
-
 
 def load_symmetrized_structure(
         cif_path: Path,
@@ -736,7 +713,6 @@ def load_symmetrized_structure(
     spg = SpacegroupAnalyzer(structure)
     structure: SymmetrizedStructure = spg.get_symmetrized_structure()
     return structure, spg
-
 
 def read_phase_name_from_str(str_path: Path) -> str:
     """Get the phase name from the str file path.
@@ -761,7 +737,6 @@ def read_phase_name_from_str(str_path: Path) -> str:
             f"Could not find phase name in {str_path}. The content is: {text}"
         ) from e
 
-
 def standardize_coords(x, y, z):
     # Adjust coordinates to specific fractional values if close
     fractions = {
@@ -784,7 +759,6 @@ def standardize_coords(x, y, z):
             z = value
 
     return x, y, z
-
 
 def fuzzy_compare(a: float, b: float):
     fa = round(a, 6)
@@ -822,7 +796,6 @@ def fuzzy_compare(a: float, b: float):
         return abs(_a - _b) <= max(rel_tol * max(abs(_a), abs(_b)), abs_tol)
 
     return is_close(fa, fb)
-
 
 def download_bgmn():
     bgmn_folder = Path(__file__).parent / "data"

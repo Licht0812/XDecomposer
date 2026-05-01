@@ -9,10 +9,6 @@ from typing import Tuple
 def setup_ddp() -> Tuple[int, int, int]:
     """
     Sets up distributed data parallel training environment.
-    Returns:
-        rank (int): Global rank.
-        local_rank (int): Local rank on the node.
-        world_size (int): Total number of processes.
     """
     if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
         rank = int(os.environ["RANK"])
@@ -39,9 +35,8 @@ def setup_ddp() -> Tuple[int, int, int]:
             )
 
         torch.cuda.set_device(local_rank)
-        
+
         if not dist.is_initialized():
-            # PyTorch 2.5+ supports device_id to avoid backend GPU guessing.
             try:
                 dist.init_process_group(
                     backend="nccl",
@@ -52,12 +47,11 @@ def setup_ddp() -> Tuple[int, int, int]:
                 dist.init_process_group(backend="nccl", init_method='env://')
 
         return rank, local_rank, world_size
-    
-    print("⚠️ Not running in DDP mode. Fallback to single GPU.")
+
+    print("Not running in DDP mode. Fallback to single GPU.")
     return 0, 0, 1
 
 def cleanup_ddp():
-    """Clean up DDP environment."""
     if dist.is_initialized():
         dist.destroy_process_group()
 

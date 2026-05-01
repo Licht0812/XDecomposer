@@ -22,7 +22,6 @@ class CustomDropout(tf.keras.layers.Layer):
     def call(self, inputs, training=None):
         return tf.nn.dropout(inputs, rate=self.rate)
 
-
 class DataSetUp(object):
     """
     Class used to train a convolutional neural network on a given
@@ -64,31 +63,31 @@ class DataSetUp(object):
         xrd = self.xrd
         # Determine total samples and pattern length
         total_samples = sum(len(aug) for aug in xrd)
-        
+
         # Find the first non-empty augmented spectra to get shape
         pattern_shape = None
         for aug in xrd:
             if len(aug) > 0:
                 pattern_shape = np.array(aug[0]).shape
                 break
-        
+
         if pattern_shape is None:
             return np.array([])
 
         # Pre-allocate numpy array to save memory
         intensities = np.zeros((total_samples, *pattern_shape), dtype=np.float32)
-        
+
         curr_idx = 0
         for augmented_spectra in xrd:
             num_aug = len(augmented_spectra)
             if num_aug > 0:
                 intensities[curr_idx:curr_idx+num_aug] = np.array(augmented_spectra, dtype=np.float32)
                 curr_idx += num_aug
-        
+
         # Ensure channel dimension exists for Conv1D
         if len(intensities.shape) == 2:
             intensities = np.expand_dims(intensities, axis=-1)
-            
+
         return intensities
 
     @property
@@ -99,10 +98,10 @@ class DataSetUp(object):
         """
         xrd = self.xrd
         total_samples = sum(len(aug) for aug in xrd)
-        
+
         # Pre-allocate numpy array
         indices = np.zeros(total_samples, dtype=np.int32)
-        
+
         curr_idx = 0
         for index, augmented_spectra in enumerate(xrd):
             num_aug = len(augmented_spectra)
@@ -123,11 +122,11 @@ class DataSetUp(object):
         x = self.x
         y = self.y
         testing_fraction = self.testing_fraction
-        
+
         total_samples = len(x)
         # Use a random permutation of indices
         indices = np.random.permutation(total_samples)
-        
+
         # Shuffle in-place if possible or use fancy indexing
         x = x[indices]
         y = y[indices]
@@ -140,11 +139,11 @@ class DataSetUp(object):
 
         else:
             n_testing = int(testing_fraction*total_samples)
-            
+
             # Use slicing to create views/copies
             test_x = x[:n_testing].copy()
             test_y = y[:n_testing].copy()
-            
+
             train_x = x[n_testing:].copy()
             train_y = y[n_testing:].copy()
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import pickle  # 用于保存匹配字典
+import pickle  # Used to persist the match table
 from ase.db import connect
 from ase import Atoms
 import numpy as np
@@ -9,7 +9,6 @@ import traceback
 from scipy.interpolate import interp1d
 import spglib
 
-# ================= 辅助函数 =================
 def prim2conv(prim_atom):
     lattice = prim_atom.get_cell()
     positions = prim_atom.get_scaled_positions()
@@ -42,7 +41,6 @@ def upsample(rows):
 
     return ynew
 
-# =============== 数据库连接 ===============
 rruff = connect('RRUFF.db')
 mp = connect('UniqCryLabeled.db')
 savedb = connect('rruff2mp.db')
@@ -50,7 +48,6 @@ savedb = connect('rruff2mp.db')
 rruff_NUM = rruff.count()
 mp_NUM = mp.count()
 
-# =============== 预加载 MP 数据 ===============
 mp_data = []
 for row in mp.select():
     try:
@@ -67,22 +64,19 @@ for row in mp.select():
         print(f"Error loading mp entry id={row.mpid}")
         traceback.print_exc()
 
-# =============== 匹配记录 ===============
 match_dict = {}
 
 def write_match_info(rruffid, mpid, match_type):
     with open('matched_pairs.txt', 'a', encoding='utf-8') as f:
         f.write(f"Matched RRUFFID={rruffid} <--> MPID={mpid} ({match_type})\n")
 
-# =============== 保存匹配结果 ===============
 def save_match(rruff_atoms, angle, intensity, rruffid, mp_entry, match_type):
     int_int = upsample(np.column_stack((eval(angle), eval(intensity))))
     int_int = int_int / int_int.max() * 100
 
-
     n_dis =  ', '.join(map(str, np.linspace(10, 80, 3500)))
     n_int =  ', '.join(map(str, int_int))
-    
+
     savedb.write(
         atoms=rruff_atoms,
         angle=n_dis,
@@ -96,7 +90,6 @@ def save_match(rruff_atoms, angle, intensity, rruffid, mp_entry, match_type):
     write_match_info(rruffid, mp_entry['mpid'], match_type)
     print(f"[Matched-{match_type}] RRUFFID={rruffid} <--> MPID={mp_entry['mpid']}")
 
-# =============== 匹配函数 ===============
 def process_rruff_id(rruff_id):
     try:
         rruff_row = rruff.get(rruff_id)
@@ -118,13 +111,11 @@ def process_rruff_id(rruff_id):
         def st_is_lattice_match(mp_latt_consts):
             return all(mp_latt_consts[i] * 0.99 <= rf_latt_consts[i] <= mp_latt_consts[i] * 1.01 for i in range(6))
 
-        # ---------- 第一轮：严格匹配 ----------
         for mp_entry in mp_data:
             if is_lattice_match(mp_entry['latt_consts']) and rruff_elements == mp_entry['elements']:
                 save_match(rruff_atoms, angle, intensity, rruffid, mp_entry, match_type="strict")
                 return True
 
-        # ---------- 第二轮：放松匹配 ----------
         for mp_entry in mp_data:
             if st_is_lattice_match(mp_entry['latt_consts']):
                 save_match(rruff_atoms, angle, intensity, rruffid, mp_entry, match_type="relaxed")
@@ -137,7 +128,6 @@ def process_rruff_id(rruff_id):
         traceback.print_exc()
         return False
 
-# =============== 主函数 ===============
 if __name__ == "__main__":
     success_count = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
@@ -147,7 +137,6 @@ if __name__ == "__main__":
 
     print(f"\n[Summary] Matched entries: {success_count} / {rruff_NUM}")
 
-    # 保存匹配字典
     with open('matched_dict.pkl', 'wb') as f:
         pickle.dump(match_dict, f)
 

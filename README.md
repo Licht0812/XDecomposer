@@ -1,24 +1,19 @@
-
-# XDecomposer
-
-
-
 <p align="center">
-  <b>Learning Prior-Free Set Decomposition for Multiphase X-ray Diffraction</b>
+  <b>XDecomposer</b>: Learning Prior-Free Set Decomposition for Multiphase X-ray Diffraction
 </p>
 
 <p align="center">
-  <a href="https://github.com/Licht0812/XRDUnmix/stargazers">
-    <img src="https://img.shields.io/github/stars/Licht0812/XRDUnmix?style=social" alt="GitHub Stars">
+  <a href="https://github.com/your-org/XDecomposer/stargazers">
+    <img src="https://img.shields.io/github/stars/your-org/XDecomposer?style=social" alt="GitHub Stars">
   </a>
-  <a href="https://github.com/Licht0812/XRDUnmix/network/members">
-    <img src="https://img.shields.io/github/forks/Licht0812/XRDUnmix?style=social" alt="GitHub Forks">
+  <a href="https://github.com/your-org/XDecomposer/network/members">
+    <img src="https://img.shields.io/github/forks/your-org/XDecomposer?style=social" alt="GitHub Forks">
   </a>
-  <a href="https://github.com/Licht0812/XRDUnmix/issues">
-    <img src="https://img.shields.io/github/issues/Licht0812/XRDUnmix" alt="Issues">
+  <a href="https://github.com/your-org/XDecomposer/issues">
+    <img src="https://img.shields.io/github/issues/your-org/XDecomposer" alt="Issues">
   </a>
-  <a href="https://github.com/Licht0812/XRDUnmix/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Licht0812/XRDUnmix" alt="License">
+  <a href="https://github.com/your-org/XDecomposer/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/your-org/XDecomposer" alt="License">
   </a>
 </p>
 
@@ -32,13 +27,12 @@ It is designed to separate complex mixed diffraction signals into interpretable 
 
 The framework integrates:
 
-- Self-supervised representation learning  
-- Supervised decomposition modeling  
-- Fine-tuning on real experimental data  
-- Unified training / evaluation pipelines  
+- Self-supervised representation learning
+- Supervised decomposition modeling
+- Fine-tuning on real experimental data
+- Unified training / evaluation pipelines
 
 ---
-
 
 ## Pre-trained Models & Dataset
 
@@ -48,18 +42,17 @@ Please download and extract them into your local **XDecomposer/** directory.
 
 **Google Drive Download** [Link](https://drive.google.com/drive/folders/1bdgzdtouRn7TObqmvMgNLdA5PGPx0dVt?usp=sharing)
 
-
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/Licht0812/XRDUnmix.git
-cd XRDUnmix
+git clone https://github.com/your-org/XDecomposer.git
+cd XDecomposer
 conda create -n xdecomposer python=3.10
 conda activate xdecomposer
 pip install -r requirements.txt
-````
+```
 
 ---
 
@@ -133,7 +126,7 @@ bash scripts/bash_test/run_rruff_k_test_kfold.sh
 ```text
 XDecomposer/
 ├── configs/                 # Path / environment settings
-│   ├── ablation_configs/          
+│   ├── ablation_configs/
 │   └── paths.sh
 │
 ├── scripts/
@@ -143,7 +136,7 @@ XDecomposer/
 │   └── python_runners/      # Python entrypoints
 │
 ├── src/                    # Core model source code
-├── tutorial/               # Tutorial examples 
+├── tutorial/               # Tutorial examples
 └── checkpoints/            # Saved weights
 ```
 
@@ -167,4 +160,3 @@ If you use **XDecomposer** in your research, please cite:
 ```bibtex
 
 ```
-

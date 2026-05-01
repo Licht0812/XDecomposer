@@ -5,7 +5,6 @@ import random
 import math
 import numpy as np
 
-
 class BroadGen(object):
     """
     Class used to simulate xrd spectra with broad peaks
@@ -59,7 +58,6 @@ class BroadGen(object):
         sigma = np.sqrt(1/(2*np.log(2)))*0.5*np.degrees(beta)
         return sigma**2
 
-
     @property
     def broadened_spectrum(self):
 
@@ -100,7 +98,6 @@ class BroadGen(object):
         form_signal = [[val] for val in noisy_signal]
 
         return form_signal
-
 
 def main(struc, num_broadened, min_domain_size, max_domain_size, min_angle=10.0, max_angle=80.0):
 

@@ -5,7 +5,6 @@ import math
 import random
 import numpy as np
 
-
 class TextureGen(object):
     """
     Class used to simulate diffraction patterns with

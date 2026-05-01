@@ -1,165 +1,164 @@
-import os
-import torch
-import torch.nn as nn
-import numpy as np
-import time
 import argparse
-from data_utils import get_dataloaders, OnlineMixingConfig
-from model import get_model
-from metrics_utils import SeparationLoss, calculate_all_metrics
+import os
+import time
 
-# =============================================================================
-# Configuration
-# =============================================================================
+import numpy as np
+import torch
+
+from data_utils import OnlineMixingConfig, get_dataloaders
+from metrics_utils import SeparationLoss, calculate_all_metrics
+from model import get_model
+
 
 config = OnlineMixingConfig(
     MIN_K=2,
     MAX_K=4,
     MIN_WEIGHT=0.15,
     XRD_LENGTH=3500,
-    AUGMENT=False, # No augment for test
+    AUGMENT=False,
     NOISE_LEVEL=0.01,
-    SEED=7
+    SEED=7,
 )
 
-DB_PATH = '/data/group/project1/Crystal/UniqCry/mp20-xrd_data'
+DB_PATH = "data/UniqRruffCrystal.db"
 BATCH_SIZE = 64
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-MODEL_PATH = 'best_separation_model.pth'
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+MODEL_PATH = "best_separation_model.pth"
 NUM_WORKERS = 8
+NUM_FOLDS = 5
 
-# =============================================================================
-# Evaluation Function
-# =============================================================================
 
 def build_reference_library(test_loader):
-    """
-    Builds a reference library of pure XRD patterns for all IDs in the test set.
-    """
-    print("Building reference library from test set IDs...")
+    """Build a reference library from the test split."""
+    print("Building reference library...")
     library = {}
-    
-    # Iterate once to collect unique patterns for each ID
+
     for batch in test_loader:
-        xrds = batch['single_xrds'] # [B, K, L]
-        pids = batch['phase_ids']   # [B, K]
-        weights = batch['weights']  # [B, K]
-        
-        B, K, L = xrds.shape
-        for i in range(B):
-            for k in range(K):
-                pid = int(pids[i, k])
-                w = float(weights[i, k])
-                if pid != -1 and w > 1e-6 and pid not in library:
-                    # Pure pattern = scaled_xrd / weight
-                    pure = xrds[i, k] / w
-                    library[pid] = pure.cpu()
-                    
-    ref_ids = sorted(list(library.keys()))
-    ref_patterns = torch.stack([library[rid] for rid in ref_ids])
-    
-    print(f"Reference library built with {len(ref_ids)} unique crystal types.")
+        xrds = batch["single_xrds"]
+        phase_ids = batch["phase_ids"]
+        weights = batch["weights"]
+
+        batch_size, num_sources, _ = xrds.shape
+        for batch_idx in range(batch_size):
+            for source_idx in range(num_sources):
+                phase_id = int(phase_ids[batch_idx, source_idx])
+                weight = float(weights[batch_idx, source_idx])
+                if phase_id != -1 and weight > 1e-6 and phase_id not in library:
+                    library[phase_id] = (xrds[batch_idx, source_idx] / weight).cpu()
+
+    ref_ids = sorted(library.keys())
+    ref_patterns = torch.stack([library[ref_id] for ref_id in ref_ids])
+    print(f"Reference library size: {len(ref_ids)}")
     return ref_patterns.to(DEVICE), ref_ids
 
+
 def evaluate_model(model, test_loader, ref_lib, ref_ids, num_phases):
+    """Evaluate the model on one fold."""
     model.eval()
+    criterion = SeparationLoss()
     running_metrics = {
-        'rwp': 0.0, 'pearson': 0.0, 'si_sdr': 0.0, 'sir': 0.0, 'sar': 0.0,
-        'delta_2theta': 0.0, 'fwhm_error': 0.0, 'intensity_consistency': 0.0,
-        'act_f1': 0.0, 'act_precision': 0.0, 'act_recall': 0.0, 'act_exact_match': 0.0,
-        'top1_acc': 0.0, 'top3_acc': 0.0, 'top10_acc': 0.0, 'oracle_exact_match': 0.0,
-        'quant_mae': 0.0
+        "loss": 0.0,
+        "si_sdr": 0.0,
+        "pearson_corr": 0.0,
+        "sir": 0.0,
+        "sar": 0.0,
+        "delta_2theta": 0.0,
+        "fwhm_error": 0.0,
+        **{f"id_acc_top{k}": 0.0 for k in range(1, 11)},
     }
-    count = 0
-    
-    print(f"Evaluating on test set for {num_phases} phases...")
-    since = time.time()
-    
+    sample_count = 0
+    phase_count = 0
+
+    print(f"Evaluating {num_phases} phases...")
+    start = time.time()
+
     with torch.no_grad():
         for batch in test_loader:
-            inputs = batch['multiphase_xrd'].to(DEVICE)
-            targets = batch['single_xrds'].to(DEVICE)
-            phase_ids = batch['phase_ids'].to(DEVICE)
+            inputs = batch["multiphase_xrd"].to(DEVICE)
+            targets = batch["single_xrds"].to(DEVICE)
+            phase_ids = batch["phase_ids"].to(DEVICE)
 
-            outputs = model(inputs) # [B, 4, L]
-            
-            # Calculate metrics for the batch
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
             batch_metrics = calculate_all_metrics(
-                outputs, targets, phase_ids, 
-                reference_library=ref_lib, 
-                reference_ids=ref_ids
+                outputs,
+                targets,
+                phase_ids,
+                reference_library=ref_lib,
+                reference_ids=ref_ids,
             )
-            
-            for k in running_metrics:
-                if k in batch_metrics:
-                    running_metrics[k] += batch_metrics[k] * inputs.size(0)
-            
-            count += inputs.size(0)
+            active_mask = torch.sum(targets ** 2, dim=-1) > 1e-4
+            batch_phase_count = int(active_mask.sum().item())
 
-    time_elapsed = time.time() - since
-    test_metrics = {k: v / count for k, v in running_metrics.items()}
-    
-    print(f'Evaluation for {num_phases} phases complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
+            running_metrics["loss"] += loss.item() * inputs.size(0)
+            for key in batch_metrics:
+                if key in running_metrics:
+                    running_metrics[key] += batch_metrics[key] * batch_phase_count
+            sample_count += inputs.size(0)
+            phase_count += batch_phase_count
+
+    elapsed = time.time() - start
+    test_metrics = {}
+    for key, value in running_metrics.items():
+        denom = sample_count if key == "loss" else max(1, phase_count)
+        test_metrics[key] = value / max(1, denom)
+
+    print(f"Finished in {elapsed // 60:.0f}m {elapsed % 60:.0f}s")
     print(f"--- Results for {num_phases} phases ---")
-    for k, v in test_metrics.items():
-        print(f'{k:20s}: {v:.4f}')
+    for key, value in test_metrics.items():
+        print(f"{key:20s}: {value:.4f}")
     print("-" * 30)
-    
     return test_metrics
 
-# =============================================================================
-# Main
-# =============================================================================
 
 if __name__ == "__main__":
-    DB_PATH = '/data/group/project1/Crystal/UniqRruffCrystal.db'
-    NUM_FOLDS = 5
-    
     all_results = {2: [], 3: [], 4: []}
-    
+
     for num_phases in [2, 3, 4]:
-        print(f"\\n{'='*50}")
-        print(f"Evaluating for {num_phases} phases")
-        print(f"{'='*50}\\n")
-        
+        print(f"\n{'=' * 50}")
+        print(f"Evaluating {num_phases} phases")
+        print(f"{'=' * 50}\n")
+
         config.MIN_K = num_phases
         config.MAX_K = num_phases
-        
+
         for fold in range(NUM_FOLDS):
             print(f"--- Fold {fold} ---")
             _, _, test_loader = get_dataloaders(
-                DB_PATH, config, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS,
-                num_folds=NUM_FOLDS, fold=fold
+                DB_PATH,
+                config,
+                batch_size=BATCH_SIZE,
+                num_workers=NUM_WORKERS,
+                num_folds=NUM_FOLDS,
+                fold=fold,
             )
 
             ref_lib, ref_ids = build_reference_library(test_loader)
 
-            model = get_model("baseline", out_channels=4).to(DEVICE) # output channels remains 4
-            model_path = f'best_separation_model_fold_{fold}.pth'
-            
+            model = get_model("baseline", out_channels=4).to(DEVICE)
+            model_path = f"best_separation_model_fold_{fold}.pth"
             if os.path.exists(model_path):
                 print(f"Loading model from {model_path}")
                 model.load_state_dict(torch.load(model_path, map_location=DEVICE))
             else:
-                print(f"Warning: {model_path} not found. Using randomly initialized model.")
+                print(f"Warning: {model_path} not found. Using random weights.")
 
             metrics = evaluate_model(model, test_loader, ref_lib, ref_ids, num_phases)
             all_results[num_phases].append(metrics)
-            
-    # Calculate and print averages
-    print("\\n\\n" + "="*50)
-    print("FINAL AVERAGED RESULTS ACROSS 5 FOLDS")
-    print("="*50)
-    
-    for num_phases in [2, 3, 4]:
-        print(f"\\n--- Average Results for {num_phases} phases ---")
-        fold_metrics = all_results[num_phases]
-        if not fold_metrics: continue
-        
-        keys = fold_metrics[0].keys()
-        avg_metrics = {k: np.mean([fm[k] for fm in fold_metrics]) for k in keys}
-        std_metrics = {k: np.std([fm[k] for fm in fold_metrics]) for k in keys}
-        
-        for k in keys:
-            print(f'{k:20s}: {avg_metrics[k]:.4f} ± {std_metrics[k]:.4f}')
 
+    print("\n\n" + "=" * 50)
+    print("FINAL AVERAGED RESULTS")
+    print("=" * 50)
+
+    for num_phases in [2, 3, 4]:
+        print(f"\n--- Average results for {num_phases} phases ---")
+        fold_metrics = all_results[num_phases]
+        if not fold_metrics:
+            continue
+
+        keys = fold_metrics[0].keys()
+        avg_metrics = {key: np.mean([item[key] for item in fold_metrics]) for key in keys}
+        std_metrics = {key: np.std([item[key] for item in fold_metrics]) for key in keys}
+
+        for key in keys:
+            print(f"{key:20s}: {avg_metrics[key]:.4f} ± {std_metrics[key]:.4f}")

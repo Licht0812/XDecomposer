@@ -47,10 +47,8 @@ from src.utils.logging import setup_logger
 from src.utils.metrics import calculate_separation_metrics
 from src.utils.optimization import NoamScheduler, get_cosine_schedule_with_warmup
 
-
 DEFAULT_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train_config.yaml")
 TRANSFORMER_MIXTURE_LOSS_WEIGHT = 5.0
-
 
 def _flatten_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Flatten the YAML sections into argparse-compatible defaults."""
@@ -62,7 +60,6 @@ def _flatten_config(config: Dict[str, Any]) -> Dict[str, Any]:
             flat[key] = value
     return flat
 
-
 def _expand_env_vars(value: Any) -> Any:
     if isinstance(value, str):
         return os.path.expandvars(value)
@@ -72,7 +69,6 @@ def _expand_env_vars(value: Any) -> Any:
         return {key: _expand_env_vars(item) for key, item in value.items()}
     return value
 
-
 def _load_yaml_defaults(path: str) -> Dict[str, Any]:
     if not path:
         return {}
@@ -80,16 +76,13 @@ def _load_yaml_defaults(path: str) -> Dict[str, Any]:
         config = yaml.safe_load(f) or {}
     return _flatten_config(_expand_env_vars(config))
 
-
 def _format_template(template: str, args: argparse.Namespace, timestamp: str) -> str:
     values = vars(args).copy()
     values["timestamp"] = timestamp
     return template.format(**values)
 
-
 def is_distributed() -> bool:
     return dist.is_available() and dist.is_initialized()
-
 
 def reduce_metrics(metrics: Dict[str, float], device: torch.device) -> Dict[str, float]:
     if not is_distributed():
@@ -100,39 +93,31 @@ def reduce_metrics(metrics: Dict[str, float], device: torch.device) -> Dict[str,
     values /= dist.get_world_size()
     return {k: float(v.item()) for k, v in zip(keys, values)}
 
-
 def limit_steps(loader_len: int, max_steps: int | None) -> int:
     if max_steps is None or max_steps <= 0:
         return max(1, loader_len)
     return max(1, min(loader_len, max_steps))
-
 
 def autocast_context(device: torch.device):
     if device.type == "cuda":
         return torch.amp.autocast("cuda")
     return nullcontext()
 
-
 def mixture_loss_weight(baseline_name: str) -> float:
     """Soft mixture consistency is only needed by the direct Transformer decoder."""
     return TRANSFORMER_MIXTURE_LOSS_WEIGHT if baseline_name == "transformer" else 0.0
-
 
 def align_predictions(preds: torch.Tensor, best_perms: torch.Tensor) -> torch.Tensor:
     batch_size, num_sources, length = preds.shape
     inv_perms = torch.argsort(best_perms, dim=1)
     return torch.gather(preds, 1, inv_perms.unsqueeze(-1).expand(batch_size, num_sources, length))
 
-
 def validate_model(model, val_loader, device, args, rank: int) -> Dict[str, float]:
     model.eval()
     totals = {
         "loss": 0.0,
         "si_sdr": 0.0,
-        "rwp": 0.0,
         "pearson_corr": 0.0,
-        "act_acc": 0.0,
-        "act_f1": 0.0,
     }
     steps = 0
 
@@ -147,7 +132,7 @@ def validate_model(model, val_loader, device, args, rank: int) -> Dict[str, floa
 
             with autocast_context(device):
                 preds, activity_logits = model(mix)
-                loss, best_perms, loss_parts, aligned_activity = calculate_baseline_loss(
+                loss, best_perms, loss_parts, _aligned_activity = calculate_baseline_loss(
                     preds,
                     targets,
                     activity_logits,
@@ -165,24 +150,13 @@ def validate_model(model, val_loader, device, args, rank: int) -> Dict[str, floa
             )
             sisdr = calculate_pit_sisdr(preds, targets)
 
-            act_pred = (torch.sigmoid(activity_logits) > 0.5).float()
-            act_acc = (act_pred == aligned_activity).float().mean().item()
-            tp = (act_pred * aligned_activity).sum()
-            fp = (act_pred * (1 - aligned_activity)).sum()
-            fn = ((1 - act_pred) * aligned_activity).sum()
-            act_f1 = (2 * tp / (2 * tp + fp + fn + 1e-8)).item()
-
             totals["loss"] += loss.item()
             totals["si_sdr"] += sisdr
-            totals["rwp"] += sep_metrics["rwp"]
             totals["pearson_corr"] += sep_metrics["pearson_corr"]
-            totals["act_acc"] += act_acc
-            totals["act_f1"] += act_f1
             steps += 1
 
     local = {k: v / max(1, steps) for k, v in totals.items()}
     return reduce_metrics(local, device)
-
 
 def visualize_separation(model, dataset, device, rank, epoch: int, save_dir: str, num_samples: int = 2) -> None:
     if rank != 0:
@@ -237,7 +211,6 @@ def visualize_separation(model, dataset, device, rank, epoch: int, save_dir: str
     plt.tight_layout()
     plt.savefig(os.path.join(save_dir, f"vis_epoch_{epoch + 1}.png"), dpi=140)
     plt.close(fig)
-
 
 def parse_args() -> argparse.Namespace:
     pre_parser = argparse.ArgumentParser(add_help=False)
@@ -326,7 +299,6 @@ def parse_args() -> argparse.Namespace:
     if not args.save_dir:
         args.save_dir = _format_template(args.save_dir_template, args, timestamp)
     return args
-
 
 def main() -> None:
     args = parse_args()
@@ -450,7 +422,6 @@ def main() -> None:
             train_loader.sampler.set_epoch(epoch)
         model.train()
         epoch_loss = 0.0
-        epoch_act_acc = 0.0
         steps = 0
         mix_weight = mixture_loss_weight(args.baseline_name)
 
@@ -464,7 +435,7 @@ def main() -> None:
             optimizer.zero_grad(set_to_none=True)
             with autocast_context(device):
                 preds, activity_logits = model(mix)
-                loss, best_perms, loss_parts, aligned_activity = calculate_baseline_loss(
+                loss, best_perms, loss_parts, _aligned_activity = calculate_baseline_loss(
                     preds,
                     targets,
                     activity_logits,
@@ -481,20 +452,16 @@ def main() -> None:
             scaler.update()
             scheduler.step()
 
-            act_pred = (torch.sigmoid(activity_logits.detach()) > 0.5).float()
-            act_acc = (act_pred == aligned_activity.detach()).float().mean().item()
             epoch_loss += loss.detach().item()
-            epoch_act_acc += act_acc
             steps += 1
 
             if rank == 0:
-                iterator.set_postfix(loss=f"{loss.item():.4f}", act_acc=f"{act_acc:.2f}")
+                iterator.set_postfix(loss=f"{loss.item():.4f}")
                 if not args.disable_swanlab:
                     log_payload = {
                         "train/loss_step": loss.item(),
                         "train/sep_loss_step": loss_parts["sep_loss"].item(),
                         "train/activity_loss_step": loss_parts["activity_loss"].item(),
-                        "train/act_acc_step": act_acc,
                         "lr": optimizer.param_groups[0]["lr"],
                     }
                     if "mixture_loss" in loss_parts:
@@ -503,25 +470,22 @@ def main() -> None:
 
         local_train = {
             "train_loss": epoch_loss / max(1, steps),
-            "train_act_acc": epoch_act_acc / max(1, steps),
         }
         train_metrics = reduce_metrics(local_train, device)
         val_metrics = validate_model(model, val_loader, device, args, rank)
 
         if rank == 0:
             logging.info(
-                "Epoch %d | Train %.5f | Val %.5f | SI-SDR %.3f | Pearson %.3f | ActAcc %.3f",
+                "Epoch %d | Train %.5f | Val %.5f | SI-SDR %.3f | Pearson %.3f",
                 epoch + 1,
                 train_metrics["train_loss"],
                 val_metrics["loss"],
                 val_metrics["si_sdr"],
                 val_metrics["pearson_corr"],
-                val_metrics["act_acc"],
             )
             if not args.disable_swanlab:
                 log_payload = {
                     "train/loss": train_metrics["train_loss"],
-                    "train/act_acc": train_metrics["train_act_acc"],
                     "lr": optimizer.param_groups[0]["lr"],
                 }
                 log_payload.update({f"val/{k}": v for k, v in val_metrics.items()})
@@ -538,7 +502,6 @@ def main() -> None:
     if rank == 0 and not args.disable_swanlab and sw is not None:
         sw.finish()
     cleanup_ddp()
-
 
 if __name__ == "__main__":
     try:

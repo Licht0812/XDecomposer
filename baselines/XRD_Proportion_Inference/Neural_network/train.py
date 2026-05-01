@@ -11,9 +11,7 @@ from data_utils import get_dataloaders, OnlineMixingConfig
 from model import get_model
 from metrics_utils import SeparationLoss, calculate_all_metrics
 
-# =============================================================================
 # Configuration
-# =============================================================================
 
 config = OnlineMixingConfig(
     MIN_K=2,
@@ -25,16 +23,14 @@ config = OnlineMixingConfig(
     SEED=7
 )
 
-DB_PATH = '/data/group/project1/Crystal/UniqCry/mp20-xrd_data'
-BATCH_SIZE = 64 # 增大 batch_size 提高并行度
+DB_PATH = 'data/mp20-xrd_data'
+BATCH_SIZE = 64
 NUM_EPOCHS = 50
 LEARNING_RATE = 0.001
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-NUM_WORKERS = 8 # 增加并行加载数据的进程数
+NUM_WORKERS = 8
 
-# =============================================================================
 # Training Function
-# =============================================================================
 
 def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
     since = time.time()
@@ -53,7 +49,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
 
             running_loss = 0.0
             running_metrics = {
-                'rwp': 0.0, 'pearson': 0.0, 'si_sdr': 0.0
+                'pearson_corr': 0.0, 'si_sdr': 0.0
             }
             count = 0
             iter_count = 0
@@ -75,7 +71,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
                         optimizer.step()
 
                 running_loss += loss.item() * inputs.size(0)
-                
+
                 # Calculate metrics for the batch (Training/Val only use waveform metrics)
                 batch_metrics = calculate_all_metrics(
                     outputs.detach(), targets, phase_ids
@@ -83,11 +79,10 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
                 for k in running_metrics:
                     if k in batch_metrics:
                         running_metrics[k] += batch_metrics[k] * inputs.size(0)
-                
+
                 count += inputs.size(0)
                 iter_count += 1
-                
-                # 每 100 个 batch 打印一次进度
+
                 if iter_count % 100 == 0:
                     current_loss = running_loss / count
                     print(f'  [{phase}] Batch {iter_count}/{total_batches} | Loss: {current_loss:.4f} SI-SDR: {batch_metrics.get("si_sdr", 0):.4f}')
@@ -95,7 +90,11 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
             epoch_loss = running_loss / count
             epoch_metrics = {k: v / count for k, v in running_metrics.items()}
 
-            print(f'{phase} Loss: {epoch_loss:.4f} SI-SDR: {epoch_metrics["si_sdr"]:.4f} Pearson: {epoch_metrics["pearson"]:.4f}')
+            print(
+                f'{phase} Loss: {epoch_loss:.4f} '
+                f'SI-SDR: {epoch_metrics["si_sdr"]:.4f} '
+                f'Pearson: {epoch_metrics["pearson_corr"]:.4f}'
+            )
 
             # Deep copy the model if it's the best (based on SI-SDR)
             if phase == 'val' and epoch_metrics['si_sdr'] > best_si_sdr:
@@ -112,16 +111,14 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
     model.load_state_dict(best_model_wts)
     return model
 
-# =============================================================================
 # Main
-# =============================================================================
 
 if __name__ == "__main__":
     # 1. Create Dataloaders
     train_loader, val_loader, test_loader = get_dataloaders(
         DB_PATH, config, batch_size=BATCH_SIZE, num_workers=NUM_WORKERS
     )
-    
+
     dataloaders = {
         'train': train_loader,
         'val': val_loader,

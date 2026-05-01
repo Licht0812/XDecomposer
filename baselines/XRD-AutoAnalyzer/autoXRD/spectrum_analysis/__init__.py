@@ -45,7 +45,6 @@ class CustomDropout(tf.keras.layers.Layer):
     def call(self, inputs, training=None):
         return tf.nn.dropout(inputs, rate=self.rate)
 
-
 class SpectrumAnalyzer(object):
     """
     Class used to process and classify xrd spectra.
@@ -467,7 +466,6 @@ class SpectrumAnalyzer(object):
 
         return stripped_y, last_normalization*new_normalization, scaling_constant, is_done
 
-
     def calc_std_dev(self, two_theta, tau):
         """
         calculate standard deviation based on angle (two theta) and domain size (tau)
@@ -606,7 +604,6 @@ class SpectrumAnalyzer(object):
 
         return pdf
 
-
 class KerasDropoutPrediction(object):
     """
     Ensemble model used to provide a probability distribution associated
@@ -663,7 +660,6 @@ class KerasDropoutPrediction(object):
         certanties = sorted(certanties, reverse=True)
 
         return prediction, len(certanties), certanties, num_outputs
-
 
 class PhaseIdentifier(object):
     """
@@ -886,7 +882,6 @@ def merge_results(results, cutoff, max_phases):
         results['Merged']['scale_factors'].append(unique_scales)
 
     return results['Merged']
-
 
 def main(spectra_directory, reference_directory, max_phases=3, cutoff_intensity=10, min_conf=10.0,wavelength='CuKa',
     min_angle=10.0, max_angle=80.0, parallel=True, model_path='Model.h5', is_pdf=False):

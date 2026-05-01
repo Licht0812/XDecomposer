@@ -18,7 +18,6 @@ from src.utils.metrics import calculate_separation_metrics
 from src.utils.optimization import get_cosine_schedule_with_warmup
 from src.utils.run_outputs import current_timestamp
 
-
 def build_model(checkpoint_path, device):
     """Load pre-trained XDecomposer from MP20 checkpoint."""
     ckpt = torch.load(checkpoint_path, map_location="cpu")
@@ -47,7 +46,6 @@ def build_model(checkpoint_path, device):
     model.load_state_dict(state)
     return model.to(device), config
 
-
 def create_datasets(args):
     """Create train / val / test RRUFF datasets for one fold."""
     common = dict(
@@ -71,7 +69,6 @@ def create_datasets(args):
     logging.info("Phases — train: %d, val: %d, test: %d", len(train_full.phases), len(val_ds.phases), len(test_ds.phases))
     return train_full, val_ds, test_ds
 
-
 def compute_loss(model, batch, device, args):
     """Shared forward + loss for train/val."""
     mix = batch["multiphase_xrd"].to(device)
@@ -90,7 +87,6 @@ def compute_loss(model, batch, device, args):
 
     return loss
 
-
 def train_one_epoch(model, loader, optimizer, scaler, scheduler, device, args):
     model.train()
     total, steps = 0.0, 0
@@ -106,7 +102,6 @@ def train_one_epoch(model, loader, optimizer, scaler, scheduler, device, args):
         total += loss.item(); steps += 1
     return total / max(1, steps)
 
-
 @torch.no_grad()
 def validate(model, loader, device, args):
     model.eval()
@@ -114,7 +109,6 @@ def validate(model, loader, device, args):
     for batch in tqdm(loader, desc="  val", leave=False):
         total += compute_loss(model, batch, device, args).item(); steps += 1
     return total / max(1, steps)
-
 
 @torch.no_grad()
 def evaluate_test(model, loader, device):
@@ -165,7 +159,6 @@ def evaluate_test(model, loader, device):
 
     return {k: v / max(1, steps) for k, v in acc.items()}
 
-
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", required=True)
@@ -189,7 +182,6 @@ def parse_args():
     p.add_argument("--lambda_activity", type=float, default=2.0)
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     return p.parse_args()
-
 
 def main():
     args = parse_args()
@@ -238,7 +230,6 @@ def main():
     out = {**metrics, "fold": args.fold, "run_timestamp": ts, "best_val_loss": best_val}
     for p in (os.path.join(args.save_dir, "test_metrics.json"), os.path.join(args.save_dir, f"test_metrics_{ts}.json")):
         with open(p, "w") as f: json.dump(out, f, indent=4)
-
 
 if __name__ == "__main__":
     main()

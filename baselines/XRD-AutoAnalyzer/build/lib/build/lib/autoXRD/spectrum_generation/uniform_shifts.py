@@ -5,7 +5,6 @@ import random
 import math
 import numpy as np
 
-
 class ShiftGen(object):
     """
     Class used to simulate xrd spectra with broad peaks
@@ -59,7 +58,6 @@ class ShiftGen(object):
         sigma = np.sqrt(1/(2*np.log(2)))*0.5*np.degrees(beta)
         return sigma**2
 
-
     @property
     def shifted_spectrum(self):
 
@@ -105,7 +103,6 @@ class ShiftGen(object):
         form_signal = [[val] for val in noisy_signal]
 
         return form_signal
-
 
 def main(struc, num_broadened, max_shift, min_angle=10.0, max_angle=80.0):
 

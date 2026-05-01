@@ -9,7 +9,6 @@ from torch import Tensor
 from .base import BaselineBase
 from .backbone import PretrainedXRDBackbone
 
-
 class PatchTSTBaseline(BaselineBase):
     """Use the pretrained MAE patch encoder directly with a source-wise MLP head."""
 

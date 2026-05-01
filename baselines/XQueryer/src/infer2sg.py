@@ -80,8 +80,6 @@ def run_one_epoch(model, dataloader, device, entries_dict):
     # Return metrics for the epoch
     return epoch_loss / iters, accuracy, correct_cnt, total_cnt, precision, recall, f1
 
-
-
 def main():
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
     model = Xmodel(embed_dim=3500, num_classes=args.num_classes)
@@ -105,12 +103,12 @@ def main():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', default='cuda:0', type=str, choices=['cuda:0', 'cpu'])
-    parser.add_argument('--data_dir', nargs='+', default=['/data/cb_dataset/test.db'], type=str,
+    parser.add_argument('--data_dir', nargs='+', default=['data/test.db'], type=str,
                         help='List of test data directories (space-separated). Example: --data_dir_train /path/to/test1.db /path/to/test2.db')
     parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--num_workers', default=16, type=int)
     parser.add_argument('--atom_embed', default=True, type=bool)
-    parser.add_argument('--load_path', default='/home/cb/XRDS/XQueryer/output/2024-09-09_1117/checkpoints/checkpoint_0010.pth', type=str,
+    parser.add_argument('--load_path', default='checkpoints/xqueryer/latest.pth', type=str,
                         help='Path to load pretrained single-phase identification model')
     parser.add_argument('--num_classes', default=100315, type=int)
 

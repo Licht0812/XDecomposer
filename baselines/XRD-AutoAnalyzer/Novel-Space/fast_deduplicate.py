@@ -16,7 +16,7 @@ def fast_deduplicate(input_dir, output_dir):
         return
 
     os.makedirs(output_dir)
-    
+
     # 1. Group by composition (O(N))
     print(f"Scanning {input_dir} and grouping by composition...")
     groups = defaultdict(list)
@@ -45,7 +45,7 @@ def fast_deduplicate(input_dir, output_dir):
     for i, (formula, members) in enumerate(groups.items()):
         if i % 100 == 0:
             print(f"  Processing group {i+1}/{len(groups)}: {formula}...")
-        
+
         unique_in_group = []
         for filename, struc in members:
             is_unique = True
@@ -55,7 +55,7 @@ def fast_deduplicate(input_dir, output_dir):
                     break
             if is_unique:
                 unique_in_group.append((filename, struc))
-        
+
         # Copy unique files to output directory
         for filename, _ in unique_in_group:
             shutil.copy(os.path.join(input_dir, filename), os.path.join(output_dir, filename))
@@ -68,5 +68,5 @@ if __name__ == "__main__":
     parser.add_argument('--input', default='All_CIFs', help='Input directory of CIFs')
     parser.add_argument('--output', default='Cleaned_CIFs', help='Output directory for unique CIFs')
     args = parser.parse_args()
-    
+
     fast_deduplicate(args.input, args.output)

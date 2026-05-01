@@ -9,13 +9,9 @@
 
 * `MP_data`:
   Contains diffraction and structure data of MP entries.
-  **If an unstable connection interrupts the download of this folder, a ZIP archive is also available on [HuggingFace](https://huggingface.co/datasets/caobin/PyXplore/resolve/main/MP_data.zip?download=true).**
+  **If the folder download is interrupted, provide a ZIP mirror before publishing this repository.**
 
-Note: All matches are subject to certain tolerances, as no two crystals are perfectly identical. The reference structure derived from **XQueryer** serves as the input for further structure determination during the refinement step.
-
-
-
-
+Note: All matches are subject to tolerances, as no two crystals are exactly identical. The reference structure derived from **XQueryer** serves as the input for further structure determination during the refinement step.
 
 ### Files
 

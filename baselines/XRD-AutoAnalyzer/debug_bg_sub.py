@@ -12,7 +12,7 @@ def smooth_spectrum(spectrum, n=20):
 
 def process_spectrum(ys):
     # ys is already 4501 points
-    
+
     ## Smooth out noise
     ys = smooth_spectrum(ys)
 
@@ -27,7 +27,7 @@ def process_spectrum(ys):
     ## Normalize from 0 to 100
     ys_final = np.array(ys_no_bg) - min(ys_no_bg)
     ys_final = list(100*np.array(ys_final)/max(ys_final))
-    
+
     return ys, background, ys_final
 
 # Create a clean spectrum with some peaks

@@ -7,7 +7,6 @@ import random
 import math
 import os
 
-
 class ImpurGen(object):
     """
     Class used to simulate xrd spectra with broad peaks
@@ -153,7 +152,6 @@ class ImpurGen(object):
         sigma = np.sqrt(1/(2*np.log(2)))*0.5*np.degrees(beta)
         return sigma**2
 
-
     @property
     def spectrum(self):
 
@@ -208,7 +206,6 @@ class ImpurGen(object):
         form_signal = [[val] for val in noisy_signal]
 
         return form_signal
-
 
 def main(struc, num_impure, impur_amt=70.0, min_angle=10.0, max_angle=80.0, ref_dir='References'):
 

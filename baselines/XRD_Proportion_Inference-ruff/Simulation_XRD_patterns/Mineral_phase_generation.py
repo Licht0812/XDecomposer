@@ -8,8 +8,6 @@ import pandas as pd
 import CifFile
 import time
 
-
-
 """
 ***** Function periodic_compt *****:
 Function to obtain the number of atom for each type in the unit cell and their atomic number
@@ -35,13 +33,13 @@ def periodic_compt(Pos,F):
     if (Pos[i][0] == k) :
       c = c + 1
       compt[j] = c
-    
-    else : 
+
+    else :
       c = 1
       j = j+1
       k = Pos[i][0]
       num_periodique[j] = k
-  
+
   compt = compt.astype(int)
   return (compt,num_periodique)
 
@@ -58,7 +56,7 @@ Parameters:
 Output:
 - No output, just modify the matrix f according to the Debye-Waller coefficient
 """
-  
+
 #DW : matrice avec coeff de DW
 #f : matrice des facteurs de diffusion atomique
 #theta : vecteur des valeurs de theta
@@ -68,8 +66,7 @@ def Debye_w(DW,f,theta,l):
   for i in range(len(DW)):
     f[0:len(f),i] = f[0:len(f),i]*np.exp(-DW[i]*(np.sin(theta*np.pi/180)*np.sin(theta*np.pi/180))/(l*l))
   return (f)
-  
-  
+
 """
 ***FONCTIONS FACTEUR DIFFUSION ATOMIQUE***
 
@@ -132,8 +129,7 @@ def factor_atomic_diffusion(d,factor):
     f = f + c
     F[j] = f
   return(F)
-  
-  
+
 """
 ***** Function matrix_f_atomic *****
 Return the atomic diffusion factor for all atoms and all diffraction angles (linked with d).
@@ -152,7 +148,6 @@ def matrix_f_atomic(d,facteur):
   for i in range(len(d)):
     f_diffusion[i+1,:] = factor_atomic_diffusion(d[i],facteur)
   return f_diffusion
-
 
 """
 ***** Function  diffractogram *****
@@ -176,7 +171,6 @@ Parameters:
 """
 
 def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_alpha,cos_beta,cos_gamma,sin_alpha,sin_beta,sin_gamma,cos_beta_star,d_min,num,facteur,compt,Pos,theta_b,Gauss=True):
-  
 
   #Distance between two planes of atoms according to the matrix M_hkl
   D_inter_ret = np.sqrt(v/
@@ -189,7 +183,6 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
     )
   D_inter_ret[0] = 0
 
-
   #Associating the d values with the h,k,l corresponding values
   D_val_hkl = np.zeros(shape=(len(D_inter_ret),4))
   D_val_hkl[:,0] = D_inter_ret
@@ -199,25 +192,24 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
   D_val_hkl_tri=D_val_hkl[D_val_hkl[:,0].argsort()][::-1]
 
   # Remove the values that are not in the d range
-  compteur = 0 
+  compteur = 0
   D_hkl = np.zeros(shape=(len(D_val_hkl_tri),4))
 
   for i in range(len(D_val_hkl_tri)):
     if ( D_val_hkl_tri[i,0] < np.amax(d) and D_val_hkl_tri[i,0] > np.amin(d)):
       D_hkl[compteur] = D_val_hkl_tri[i]
-      compteur = compteur + 1 
+      compteur = compteur + 1
 
   D_hkl = D_hkl[0:compteur,:]
 
   #Find the theta values associated
   th_D_inter_ret = 2*np.arcsin((lamb/(2*D_hkl[:,0])))*180/np.pi
 
-
   """ Atomic factor diffusion """
   #Interpolation
   f_dif = np.zeros(shape=(len(D_hkl),len(num)))
   j = 0
-  i = 0 
+  i = 0
   while (j < len(num)):
     if (num[j] == facteur[0][i]):
       for k in range(len(D_hkl)):
@@ -225,7 +217,7 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
         g2 = np.max(np.where(D_hkl[k][0]-d <= inc_theta))
         c_dir = (facteur[g1][i]-facteur[g2][i]) / (d[g1]-d[g2])
         b = facteur[g1][i] - c_dir*d[g1]
-        f_dif[k,j] = c_dir*D_hkl[k][0]+b 
+        f_dif[k,j] = c_dir*D_hkl[k][0]+b
       j = j + 1
       i = 0
     else : i = i + 1
@@ -248,22 +240,21 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
         inc_sfactor_1 = inc_sfactor_1 + f_dif[i,z]*np.cos(2*np.pi*(D_hkl[i,1]*Pos[c+w,1]+D_hkl[i,2]*Pos[c+w,2]+D_hkl[i,3]*Pos[c+w,3]))
         inc_sfactor_2 = inc_sfactor_2 + f_dif[i,z]*np.sin(2*np.pi*(D_hkl[i,1]*Pos[c+w,1]+D_hkl[i,2]*Pos[c+w,2]+D_hkl[i,3]*Pos[c+w,3]))
       c = c + compt[z]
-    inc_sfactor_1 = inc_sfactor_1 * inc_sfactor_1 
+    inc_sfactor_1 = inc_sfactor_1 * inc_sfactor_1
     inc_sfactor_2 = inc_sfactor_2 * inc_sfactor_2
     inc_sfactor = np.sqrt(inc_sfactor_1+inc_sfactor_2)
 
     inc_sfactor = inc_sfactor*lp
     F_s[i] = inc_sfactor
-  
+
   #Matrix with theta and the corresponding Intensity
   Comb = np.zeros(shape=(len(th_D_inter_ret),2))
   Comb[:,0] = th_D_inter_ret
   Comb[:,1] = F_s
-  
 
   #Sorts repeating occurrences
   compt_same_intensity = np.ones(len(Comb))
-  Intensity = np.zeros(len(Comb)) 
+  Intensity = np.zeros(len(Comb))
   compt_intensity_diff = 0
   Intensity[compt_intensity_diff] = Comb[0,1]*Comb[0,1]
   k = round(Comb[0,0],ndigits=8)
@@ -279,7 +270,6 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
   compt_same_intensity = compt_same_intensity[0:compt_intensity_diff+1]
   Intensity = Intensity[0:compt_intensity_diff+1]
 
-
   t_bis = np.zeros(shape=(compt_intensity_diff+1,2))
   t_bis[:,1] = Intensity
   k = 0
@@ -287,7 +277,6 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
     t_bis[i,0] = Comb[k,0]
     k = (int)(k + compt_same_intensity[i])
 
-  
   #Gaussian distribution
   th = t_bis[:,0]
   Inte = t_bis[:,1]
@@ -295,7 +284,7 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
   for i in range(len(theta_b)):
     theta_b[i] = round(theta_b[i],2)
   I = np.zeros(len(theta_b))
-  
+
   if (Gauss == True):
       sigma = LMH/2*np.sqrt(2*np.log(2)) # Variance from Width at half heigth
       begin_peak = th-3*sigma
@@ -309,7 +298,7 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
                 if (t+j >= len(theta_b)):
                     break
                 I[t+j] = I[t+j] + (1/(sigma*np.sqrt(2*np.pi)))*np.exp(-((theta_b[t+j]-mu)*(theta_b[t+j]-mu))/(2*sigma*sigma))*Inte[i]
- 
+
   #Lorentz distribution
   else :
     begin_peak = th-3*LMH
@@ -323,9 +312,9 @@ def diffractogram(d,lamb,inc_theta,LMH,DW,M_hkl,v,a_param,b_param,c_param,cos_al
             if (t+j >= len(theta_b)):
               break
             I[t+j] = I[t+j] + ((2/np.pi*LMH)/(1+((theta_b[t+j]-mu)/(LMH/2))))*Inte[i]
-  
+
   return(I)
-  
+
 """
 *** FUNCTION WRITE ***
 Function to write the Intensity in a txt file
@@ -341,7 +330,7 @@ def write(I,path,name,q,a,b,c,LMH,DW,Gauss):
   fichier.write('a = '+ str(a) +' b = '+ str(b) + ' c = ' + str(c) + ' ,')
   if (Gauss == True):
     fichier.write('Gaussian ,')
-  else : 
+  else :
     fichier.write('Lorentzienne ,')
   fichier.write('LMH = ' + str(LMH) + ' ,')
   fichier.write('DW = ' + str(DW) + '\n')
@@ -350,8 +339,7 @@ def write(I,path,name,q,a,b,c,LMH,DW,Gauss):
     fichier.write(str(I[i])+'\n')
   fichier.close()
   return ()
- 
- 
+
 """
 ***** Function all_diffracto_cif *****
 
@@ -381,7 +369,7 @@ def all_diffracto_cif(path,name,theta,inc_theta,nb_diffracto,lamb,contrib,n_inc_
   beta = param[4]
   beta_star = np.pi - beta
   gamma = param[5]
-  
+
   #Load dataframe with atomic diffusion coefficient
   factor = pd.read_csv('Coeff_dif_atomiquev3.txt',header=0,sep=',')
 
@@ -394,7 +382,6 @@ def all_diffracto_cif(path,name,theta,inc_theta,nb_diffracto,lamb,contrib,n_inc_
   sin_gamma = round(np.sin(gamma*np.pi/180),ndigits=8)
   cos_beta_star = round(np.sin(beta_star*np.pi/180),ndigits=8)
 
-  
   #5% variation for a,b and c
   a_max = a + (a/100)*2
   a_min = a - (a/100)*2
@@ -409,23 +396,22 @@ def all_diffracto_cif(path,name,theta,inc_theta,nb_diffracto,lamb,contrib,n_inc_
   - Draw width at half height in [0.08,0.50]
   - Pre-processing: atomic diffusion factor calculation and h,k,l values deduce from wavelength values
   """
-  
+
   D = np.zeros(shape = (lamb.shape[0],theta.shape[0]))
   F = np.zeros(shape = (lamb.shape[0],len(theta) + 1,211))
   v = (1 - cos_alpha*cos_alpha - cos_beta*cos_beta - cos_gamma*cos_gamma+2 * cos_alpha * cos_beta *cos_gamma)
   x = 0
-  
+
   for w in lamb:
     D[x,:] = w / (2*np.sin(theta*np.pi/360))
     F[x,:,:] = matrix_f_atomic(D[x,:],factor)
     x += 1
-  
-    
+
   #Print time calculation for initial parameters.
   time_elapsed = time.time()-since
   print('Initial parameters completed in {:.0f}m {:.0f}s'.format(
       time_elapsed // 60, time_elapsed % 60))
-  
+
   #For each XRD patterns
   since = time.time()
   since_b = time.time()
@@ -449,7 +435,7 @@ def all_diffracto_cif(path,name,theta,inc_theta,nb_diffracto,lamb,contrib,n_inc_
             (v*var_c*var_c) / ((np.amin(D[x])**2)*(sin_gamma*sin_gamma)))) + 1
         k_m = (int)(np.sqrt(
             (v*var_b*var_b) / ((np.amin(D[x])**2)*(sin_beta*sin_beta)))) + 1
-        
+
         #Matrix h,k,l from h,k et l_max
         M_hkl = np.zeros(shape=((h_m*2+1)*(k_m*2+1)*(l_m*2+1),3))
         z = 0
@@ -458,29 +444,24 @@ def all_diffracto_cif(path,name,theta,inc_theta,nb_diffracto,lamb,contrib,n_inc_
                 for k in np.arange(-l_m,l_m+1):
                     M_hkl[z,:] = [i,j,k]
                     z = z + 1
-    
+
         I1 = diffractogram(D[x],w,inc_theta,LMH,DW,M_hkl,v,var_a,var_b,var_c,cos_alpha,cos_beta,cos_gamma,sin_alpha,sin_beta,sin_gamma,cos_beta_star,np.amin(D[x]),num,F[x],compt,Pos,theta)
         I = I + contrib[x]*I1
         x = x + 1
     # Write the intensity in a file
     write(I,path,name,q,a = var_a,b = var_b ,c = var_c ,LMH = LMH, DW = Dw ,Gauss = True)
-          
+
     if (q % 100 == 0):
               time_elapsed_b = time.time()-since_b
               print(str(q)+' diffractogrammes completed in {:.0f}m {:.0f}s'.format(
                   time_elapsed_b // 60, time_elapsed_b % 60))
     q = q + 1
 
-            
   #Print time
   time_elapsed = time.time()-since
   print(str(q-1)+' diffractogrammes completed in {:.0f}m {:.0f}s'.format(
       time_elapsed // 60, time_elapsed % 60))
 
-      
- 
- 
- 
 """ APPLICATION """
 
 theta_min = 4.0001

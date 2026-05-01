@@ -31,30 +31,18 @@ from src.data.core import process_pattern
 from src.data.online_mixing_dataset import create_online_mixing_dataloader
 from src.utils.metrics import calculate_separation_metrics, calculate_sisdr
 
-
 def strip_module_prefix(state_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
     return {k[7:] if k.startswith("module.") else k: v for k, v in state_dict.items()}
-
 
 def autocast_context(device: torch.device):
     if device.type == "cuda":
         return torch.amp.autocast("cuda")
     return nullcontext()
 
-
 def align_predictions(preds: torch.Tensor, best_perms: torch.Tensor) -> torch.Tensor:
     batch_size, num_sources, length = preds.shape
     inv_perms = torch.argsort(best_perms, dim=1)
     return torch.gather(preds, 1, inv_perms.unsqueeze(-1).expand(batch_size, num_sources, length))
-
-
-def calculate_quant_mae(pred_patterns: torch.Tensor, target_patterns: torch.Tensor) -> float:
-    pred_int = torch.clamp(pred_patterns.sum(dim=-1), min=0)
-    target_int = torch.clamp(target_patterns.sum(dim=-1), min=0)
-    pred_pct = pred_int / (pred_int.sum(dim=-1, keepdim=True) + 1e-8)
-    target_pct = target_int / (target_int.sum(dim=-1, keepdim=True) + 1e-8)
-    return torch.abs(pred_pct - target_pct).mean().item() * 100.0
-
 
 def pad_sources(
     targets: torch.Tensor,
@@ -89,7 +77,6 @@ def pad_sources(
         phase_ids = torch.cat([phase_ids, id_pad], dim=1)
     return targets, phase_ids
 
-
 def build_reference_bank(dataset, device: torch.device):
     print(f"Building reference bank for {len(dataset.indices)} crystals...", flush=True)
     ref_patterns = []
@@ -106,7 +93,6 @@ def build_reference_bank(dataset, device: torch.device):
         return None, None
     print(f"Reference bank ready: {len(ref_patterns)} patterns.", flush=True)
     return torch.stack(ref_patterns).to(device), torch.tensor(ref_ids, dtype=torch.long, device=device)
-
 
 def calculate_identification_topk(
     aligned_preds: torch.Tensor,
@@ -141,7 +127,6 @@ def calculate_identification_topk(
         metrics[f"id_acc_top{k}"] = hit
     return metrics
 
-
 def evaluate_model(model, test_loader, device, args, config: Dict) -> Dict[str, float]:
     model.eval()
     ref_bank = ref_ids = None
@@ -152,19 +137,11 @@ def evaluate_model(model, test_loader, device, args, config: Dict) -> Dict[str, 
     accumulated = {
         "loss": 0.0,
         "si_sdr": 0.0,
-        "rwp": 0.0,
         "pearson_corr": 0.0,
         "sir": 0.0,
         "sar": 0.0,
         "delta_2theta": 0.0,
         "fwhm_error": 0.0,
-        "intensity_consistency": 0.0,
-        "act_acc": 0.0,
-        "act_f1": 0.0,
-        "act_precision": 0.0,
-        "act_recall": 0.0,
-        "act_exact_match": 0.0,
-        "quant_mae": 0.0,
         **{f"id_acc_top{k}": 0.0 for k in range(1, 11)},
     }
     steps = 0
@@ -184,7 +161,6 @@ def evaluate_model(model, test_loader, device, args, config: Dict) -> Dict[str, 
                 sep_loss, best_perms = calculate_pit_loss(preds, targets)
 
             aligned_preds = align_predictions(preds, best_perms)
-            inv_perms = torch.argsort(best_perms, dim=1)
             metrics = calculate_separation_metrics(
                 aligned_preds,
                 targets,
@@ -194,17 +170,6 @@ def evaluate_model(model, test_loader, device, args, config: Dict) -> Dict[str, 
 
             target_energy = (targets**2).sum(dim=-1)
             target_is_active = (target_energy > 1e-6).float()
-            aligned_act_logits = torch.gather(activity_logits, 1, inv_perms)
-            act_pred = (torch.sigmoid(aligned_act_logits) > args.activity_threshold).float()
-
-            tp = (act_pred * target_is_active).sum()
-            fp = (act_pred * (1 - target_is_active)).sum()
-            fn = ((1 - act_pred) * target_is_active).sum()
-            precision = (tp / (tp + fp + 1e-8)).item()
-            recall = (tp / (tp + fn + 1e-8)).item()
-            f1 = (2 * tp / (2 * tp + fp + fn + 1e-8)).item()
-            acc = (act_pred == target_is_active).float().mean().item()
-            exact = (act_pred == target_is_active).all(dim=1).float().mean().item()
 
             id_metrics = {f"id_acc_top{k}": 0.0 for k in range(1, 11)}
             if ref_bank is not None and ref_ids is not None:
@@ -218,31 +183,16 @@ def evaluate_model(model, test_loader, device, args, config: Dict) -> Dict[str, 
 
             accumulated["loss"] += sep_loss.item()
             accumulated["si_sdr"] += calculate_sisdr(aligned_preds, targets)
-            accumulated["rwp"] += metrics["rwp"]
             accumulated["pearson_corr"] += metrics["pearson_corr"]
             accumulated["sir"] += metrics["sir"]
             accumulated["sar"] += metrics["sar"]
             accumulated["delta_2theta"] += metrics["delta_2theta"]
             accumulated["fwhm_error"] += metrics["fwhm_error"]
-            accumulated["intensity_consistency"] += metrics["intensity_ratio_consistency"]
-            accumulated["act_acc"] += acc
-            accumulated["act_f1"] += f1
-            accumulated["act_precision"] += precision
-            accumulated["act_recall"] += recall
-            accumulated["act_exact_match"] += exact
-            accumulated["quant_mae"] += calculate_quant_mae(aligned_preds, targets)
             for key, value in id_metrics.items():
                 accumulated[key] += value
             steps += 1
 
-    result = {k: v / max(1, steps) for k, v in accumulated.items()}
-    result["baseline_name"] = config.get("baseline_name", args.baseline_name or "unknown")
-    result["checkpoint"] = args.checkpoint
-    result["split"] = args.split
-    result["min_k"] = args.min_k
-    result["max_k"] = args.max_k
-    return result
-
+    return {k: v / max(1, steps) for k, v in accumulated.items()}
 
 def visualize(model, dataset, device, args, ref_bank=None, ref_ids=None) -> None:
     model.eval()
@@ -298,7 +248,6 @@ def visualize(model, dataset, device, args, ref_bank=None, ref_ids=None) -> None
         plt.savefig(os.path.join(args.save_dir, f"test_sample_{out_idx}_{sample_idx}.png"), dpi=150)
         plt.close(fig)
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate Transformer XRD separation baselines")
     parser.add_argument("--checkpoint", type=str, required=True)
@@ -324,7 +273,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable_identification", action="store_true")
 
     return parser.parse_args()
-
 
 def main() -> None:
     args = parse_args()
@@ -416,19 +364,12 @@ def main() -> None:
     )
     print(f"Dataloader ready: {len(test_loader.dataset)} samples, {len(test_loader)} batches.", flush=True)
 
-    log_path = os.path.join(args.save_dir, "evaluation.log")
-    with open(log_path, "w") as log_file:
-        log_file.write(f"checkpoint: {args.checkpoint}\n")
-        log_file.write(f"baseline_name: {baseline_name}\n")
-        log_file.write(f"data_dir: {data_dir}\n")
-        log_file.write(f"min_k: {args.min_k}, max_k: {max_k}\n")
-
     metrics = evaluate_model(model, test_loader, device, args, {**config, "baseline_name": baseline_name})
     metrics_path = os.path.join(args.save_dir, "test_metrics.json")
     with open(metrics_path, "w") as f:
         json.dump(metrics, f, indent=4)
 
-    print(f"Metrics saved to {metrics_path}")
+    print("Metrics saved.")
     for key, value in metrics.items():
         if isinstance(value, float):
             print(f"{key}: {value:.4f}")
@@ -436,8 +377,7 @@ def main() -> None:
             print(f"{key}: {value}")
 
     visualize(model, test_loader.dataset, device, args)
-    print(f"Visualizations saved to {args.save_dir}")
-
+    print("Visualizations saved.")
 
 if __name__ == "__main__":
     main()

@@ -45,7 +45,7 @@ model:
 
   # Transformer baseline.
   transformer_decoder_layers: 4
-  transformer_d_ff: null         
+  transformer_d_ff: null
 
   # iTransformer baseline.
   itransformer_dim: 256

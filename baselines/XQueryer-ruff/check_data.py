@@ -2,23 +2,23 @@ import ase.db
 import numpy as np
 import os
 
-db_path = '/data/group/project1/Crystal/UniqCryLabeled.db'
-npz_dir = '/data/group/project1/Crystal/UniqCry'
+db_path = 'data/UniqCryLabeled.db'
+npz_dir = 'data/UniqCry'
 
 def check_db():
     print(f"Connecting to {db_path}...")
     db = ase.db.connect(db_path)
-    
+
     labels = []
     ids = []
     for i, row in enumerate(db.select(limit=5000)):
         labels.append(int(getattr(row, 'Label')))
         ids.append(row.id)
-    
+
     print(f"Total rows checked: {len(labels)}")
     print(f"Min Label: {min(labels)}, Max Label: {max(labels)}")
     print(f"Min row.id: {min(ids)}, Max row.id: {max(ids)}")
-    
+
     # Check if Label is always row.id or row.id - 1
     diffs = [l - r for l, r in zip(labels, ids)]
     print(f"Unique (Label - row.id) values: {set(diffs)}")

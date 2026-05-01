@@ -18,7 +18,6 @@ import warnings
 import math
 import os
 
-
 class SpectrumPlotter(object):
     """
     Class used to plot and compare:
@@ -478,7 +477,6 @@ def XRDtoPDF(xrd, min_angle, max_angle):
 
     return R, pdf
 
-
 def scale_values(values, new_min, new_max):
     """
     Scale a list of values to a new given range [new_min, new_max].
@@ -495,7 +493,6 @@ def scale_values(values, new_min, new_max):
     ]
 
     return scaled_values
-
 
 def main(spectra_directory, spectrum_fname, predicted_phases, scale_factors, reduced_spectrum, min_angle=10.0, max_angle=80.0,
     wavelength='CuKa', save=False, show_reduced=False, inc_pdf=False, plot_both=False, raw=False, rietveld=True, refined_phases_dir=None):

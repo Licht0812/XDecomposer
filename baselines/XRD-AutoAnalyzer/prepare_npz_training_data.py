@@ -7,8 +7,8 @@ from tqdm import tqdm
 import pickle
 
 # Constants
-DB_PATH = '/data/group/project1/Crystal/UniqCryLabeled.db'
-NPZ_DIR = '/data/group/project1/Crystal/UniqCry/mp20-xrd_data/data'
+DB_PATH = 'data/UniqCryLabeled.db'
+NPZ_DIR = 'data/mp20-xrd_data/data'
 REF_DIR = 'Novel-Space/References'
 OUTPUT_TRAIN_DATA = 'NPZ_Training_Data.npy'
 OUTPUT_MAPPING = 'id_to_ref_mapping_full.pkl'
@@ -52,19 +52,19 @@ def main():
     print("Mapping IDs to References (this may take a while)...")
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    
+
     ref_to_ids = {cif: [] for cif in ref_cifs} # Fixed: Map class -> list of IDs
     id_to_ref = {} # Map ID -> class
-    
+
     # We only check IDs that have NPZ files
     for cid in tqdm(available_ids):
         ref_label = get_structure_info(cur, cid)
         if ref_label in ref_set:
             ref_to_ids[ref_label].append(cid)
             id_to_ref[cid] = ref_label
-            
+
     conn.close()
-    
+
     mapped_classes = sum(1 for ids in ref_to_ids.values() if len(ids) > 0)
     print(f"Mapped {mapped_classes} / {len(ref_cifs)} classes.")
     print(f"Total mapped IDs: {len(id_to_ref)}")
@@ -76,13 +76,13 @@ def main():
     # 4. Extract Spectra for Training
     print("Extracting spectra...")
     final_training_data = []
-    
+
     for cif in tqdm(ref_cifs):
         class_spectra = []
         cids = ref_to_ids.get(cif, [])
-        
+
         if not cids:
-            class_spectra = [np.zeros(4501)] 
+            class_spectra = [np.zeros(4501)]
         else:
             samples_collected = 0
             for cid in cids:
@@ -102,7 +102,7 @@ def main():
                             y = f(x_new)
                         class_spectra.append(y)
                         samples_collected += 1
-            
+
             if not class_spectra:
                 class_spectra = [np.zeros(4501)]
 

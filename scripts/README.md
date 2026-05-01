@@ -14,7 +14,7 @@ Activate `spectra` before running any launcher.
 
 - `bash_train/run_pretrain.sh`: pretrain the XRD encoder
 - `bash_train/run_xdecomposer.sh`: train the FiLM-based XDecomposer model
-- `bash_train/run_rruff_finetune_kfold.sh`: RRUFF 5-fold cross-validation 
+- `bash_train/run_rruff_finetune_kfold.sh`: RRUFF 5-fold cross-validation
 - `bash_test/run_mp20_k_test.sh`: test MP20 mixtures for `k=2,3,4`
 - `bash_test/run_rruff_k_test_kfold.sh`: RRUFF fold-wise zero-shot evaluation
 - `bash_ablation/run_ablation_yaml.sh`: train ablation variants

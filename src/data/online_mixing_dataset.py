@@ -39,7 +39,7 @@ class OnlineMixingXRDDataset(XRDBaseDataset):
         **kwargs
     ):
         super().__init__(singlephase_xrd_db_path, xrd_length, cache_index=True)
-        
+
         self.min_k = min_k
         self.max_k = max_k
         self.min_weight = min_weight
@@ -55,7 +55,7 @@ class OnlineMixingXRDDataset(XRDBaseDataset):
             self.indices = np.array(crystal_ids)
         else:
             self.indices = np.array(sorted(list(self.index.keys())))
-            
+
         logging.info(f"Online Mixing Dataset: {len(self.indices)} anchors, K=[{min_k}-{max_k}]")
 
     @staticmethod
@@ -76,14 +76,14 @@ class OnlineMixingXRDDataset(XRDBaseDataset):
             k = np.random.choice(range(self.min_k, self.max_k + 1), p=self.k_weights)
         else:
             k = random.randint(self.min_k, self.max_k)
-            
+
         # 2. Choose IDs
         selected_ids = {anchor_id}
         while len(selected_ids) < k:
             selected_ids.add(int(np.random.choice(self.indices)))
         pids = list(selected_ids)
         random.shuffle(pids) # Shuffle to randomize position
-        
+
         # 3. Choose Weights
         if self.weight_distribution == "equal":
             weights = np.ones(k) / k
@@ -93,17 +93,17 @@ class OnlineMixingXRDDataset(XRDBaseDataset):
             else:
                 raw = np.random.dirichlet(np.ones(k))
                 weights = raw * rem + self.min_weight
-                
+
         return [{'id': pid, 'w': w, 'anchor': pid==anchor_id} for pid, w in zip(pids, weights)]
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         anchor_id = int(self.indices[idx])
         plan = self._get_mixing_components(anchor_id)
-        
+
         raw_tensors = []
         weights = []
         pids = []
-        
+
         # Load & Process
         for item in plan:
             # Load Raw (No Norm)
@@ -113,29 +113,29 @@ class OnlineMixingXRDDataset(XRDBaseDataset):
                 t = process_pattern(patterns[0], self.xrd_length, norm_method="none")
             else:
                 t = torch.zeros(self.xrd_length)
-                
+
             raw_tensors.append(t)
             weights.append(item['w'])
             pids.append(item['id'])
-            
+
         # Mix
         mix = torch.zeros(self.xrd_length)
         for t, w in zip(raw_tensors, weights):
             mix += t * w
-            
+
         # Noise
         if self.augment and self.noise_level > 0:
             noise = torch.randn_like(mix) * self.noise_level * (mix.max() + 1e-8)
             mix = torch.clamp(mix + noise, min=0)
-            
-        # Normalize (Max Scaling)
+
+        # Normalize
         scale = 1.0
         if self.target_norm_method == "max":
             scale = mix.max() + 1e-8
-            
+
         mix_norm = mix / scale
         targets_norm = [(t * w) / scale for t, w in zip(raw_tensors, weights)]
-        
+
         # Pad to max_k
         pad_n = self.max_k - len(targets_norm)
         if pad_n > 0:
@@ -143,9 +143,9 @@ class OnlineMixingXRDDataset(XRDBaseDataset):
             targets_norm.extend([zeros] * pad_n)
             weights.extend([0.0] * pad_n)
             pids.extend([-1] * pad_n)
-            
+
         targets_stack = torch.stack(targets_norm)
-        
+
         return {
             'multiphase_xrd': mix_norm,
             'single_xrds': targets_stack,
@@ -157,11 +157,10 @@ class OnlineMixingXRDDataset(XRDBaseDataset):
             'num_phases': len(plan)
         }
 
-# Helper for DataLoader creation
 def create_online_mixing_dataloader(
     singlephase_xrd_db_path: str,
     crystal_db_path: str,
-    config: Optional[OnlineMixingConfig] = None, # Add config object support
+    config: Optional[OnlineMixingConfig] = None,
     split: str = 'train',
     train_ratio: float = 0.8,
     val_ratio: float = 0.1,
@@ -171,14 +170,14 @@ def create_online_mixing_dataloader(
     pin_memory: Optional[bool] = None,
     **kwargs
 ) -> data.DataLoader:
-    
+
     # Use default config if not provided
     if config is None:
         config = OnlineMixingConfig()
-    
+
     # Use config values if not overridden in kwargs
     # Logic: kwargs > config > defaults
-    
+
     # 1. Dataset Params
     dataset_kwargs = {
         'min_k': kwargs.get('min_k', config.MIN_K),
@@ -193,37 +192,37 @@ def create_online_mixing_dataloader(
         'noise_level': kwargs.get('noise_level', config.NOISE_LEVEL),
         'random_single_sample': kwargs.get('random_single_sample', config.RANDOM_SINGLE_SAMPLE)
     }
-    
+
     # Use base class to quick-scan IDs
     temp_ds = XRDBaseDataset(singlephase_xrd_db_path)
     all_ids = sorted(list(temp_ds.index.keys()))
-    
+
     # Split using config seed
     seed = kwargs.get('seed', config.SEED)
     np.random.seed(seed)
     shuffled = np.array(all_ids)
     np.random.shuffle(shuffled)
-    
+
     # Split ratios from config if not provided
     t_ratio = kwargs.get('train_ratio', train_ratio)
     if 'train_ratio' not in kwargs: t_ratio = config.TRAIN_RATIO
-    
+
     v_ratio = kwargs.get('val_ratio', val_ratio)
     if 'val_ratio' not in kwargs: v_ratio = config.VAL_RATIO
-    
+
     n_train = int(len(shuffled) * t_ratio)
     n_val = int(len(shuffled) * (t_ratio + v_ratio))
-    
+
     if split == 'train': ids = shuffled[:n_train]
     elif split == 'val': ids = shuffled[n_train:n_val]
     else: ids = shuffled[n_val:]
-    
+
     ds = OnlineMixingXRDDataset(
         singlephase_xrd_db_path=singlephase_xrd_db_path,
         crystal_ids=ids.tolist(),
         **dataset_kwargs
     )
-    
+
     sampler = None
     if distributed:
         sampler = data.distributed.DistributedSampler(ds, shuffle=(split=='train'))

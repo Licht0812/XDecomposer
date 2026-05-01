@@ -40,16 +40,16 @@ def evaluate():
     x_test = test_data['x']
     y_labels = test_data['labels'] # True CIF filenames/IDs
     y_weights = test_data['weights'] # True weight fractions
-    
+
     # Initialize results storage
     all_results = []
-    
+
     # Loop through test samples
     for i in tqdm(range(len(x_test)), desc="Evaluating"):
         spectrum = x_test[i]
         true_ids = y_labels[i]
         true_weights = y_weights[i]
-        
+
         # Convert true IDs to labels using mapping
         # Only keep the sample if ALL true phases are in the References
         true_phases = []
@@ -60,7 +60,7 @@ def evaluate():
             else:
                 skip_sample = True
                 break
-        
+
         if skip_sample:
             continue
 
@@ -69,11 +69,11 @@ def evaluate():
         os.makedirs(temp_spec_dir, exist_ok=True)
         temp_spec_name = f'test_spec_{i}.xy'
         temp_spec_path = os.path.join(temp_spec_dir, temp_spec_name)
-        
+
         # SpectrumAnalyzer expects 2 columns: angle, intensity
         angles = np.linspace(MIN_ANGLE, MAX_ANGLE, len(spectrum))
         np.savetxt(temp_spec_path, np.column_stack((angles, spectrum)))
-        
+
         try:
             # 1. Phase Identification using autoXRD's branching algorithm
             # Use a slightly lower min_conf (15%) for better recall on complex mixtures
@@ -86,10 +86,10 @@ def evaluate():
                 model_path=MODEL_PATH,
                 min_conf=15.0
             )
-            
+
             # suspected_mixtures returns lists of predicted phases and confidences
             pred_mixtures, conf_mixtures, _, scale_mixtures, _ = analyzer.suspected_mixtures
-            
+
             if not pred_mixtures:
                 pred_phases = []
                 pred_weights = []
@@ -98,20 +98,20 @@ def evaluate():
                 pred_phases = pred_mixtures[0]
                 # 2. Quantification (Weight fraction estimation)
                 s_factors = scale_mixtures[0] if scale_mixtures[0] is not None else [1.0] * len(pred_phases)
-                
+
                 pred_weights = quantifier.main(
-                    temp_spec_dir, 
-                    temp_spec_name, 
-                    pred_phases, 
-                    s_factors, 
+                    temp_spec_dir,
+                    temp_spec_name,
+                    pred_phases,
+                    s_factors,
                     rietveld=False,
                     reference_dir=REF_DIR
                 )
-            
+
             # Ensure pred_weights is valid
             if pred_weights is None:
                 pred_weights = []
-            
+
             # Store results
             if len(pred_phases) == len(pred_weights):
                 all_results.append({
@@ -121,7 +121,7 @@ def evaluate():
                     "pred_phases": [str(p) for p in pred_phases],
                     "pred_weights": [float(w) for w in pred_weights]
                 })
-            
+
         except Exception as e:
             # print(f"Error evaluating sample {i}: {e}")
             continue
@@ -132,22 +132,22 @@ def evaluate():
     # Calculate Metrics
     # 1. Phase Precision/Recall
     # 2. Weight Fraction Error (MAE for correctly identified phases)
-    
+
     total_precision = 0
     total_recall = 0
     weight_mae = []
-    
+
     for res in all_results:
         true_set = set(res["true_phases"])
         pred_set = set(res["pred_phases"])
-        
+
         intersection = true_set.intersection(pred_set)
         precision = len(intersection) / len(pred_set) if pred_set else 0
         recall = len(intersection) / len(true_set) if true_set else 0
-        
+
         total_precision += precision
         total_recall += recall
-        
+
         # Weight error for correctly matched phases
         for p in intersection:
             t_idx = res["true_phases"].index(p)
@@ -160,15 +160,15 @@ def evaluate():
         "mean_weight_mae": float(np.mean(weight_mae)) if weight_mae else 0,
         "num_samples": len(all_results)
     }
-    
+
     final_output = {
         "metrics": metrics,
         "detailed_results": all_results
     }
-    
+
     with open(OUTPUT_JSON, 'w') as f:
         json.dump(final_output, f, indent=4)
-    
+
     print(f"Evaluation complete. Metrics: {metrics}")
     print(f"Detailed results saved to {OUTPUT_JSON}")
 

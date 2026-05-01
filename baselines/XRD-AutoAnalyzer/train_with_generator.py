@@ -10,7 +10,7 @@ import random
 from autoXRD import cnn
 
 # Constants
-NPZ_DIR = '/data/group/project1/Crystal/UniqCry/mp20-xrd_data/data'
+NPZ_DIR = 'data/mp20-xrd_data/data'
 MAPPING_PATH = 'id_to_ref_mapping_full.pkl'
 MODEL_OUT_PATH = 'Model_NPZ_Generator.h5'
 BATCH_SIZE = 128
@@ -22,7 +22,7 @@ class XRDDataGenerator(Sequence):
         self.id_to_ref = id_to_ref # dict: cid -> ref_name
         self.ref_list = ref_list # list: sorted ref names
         self.ref_to_index = {ref: i for i, ref in enumerate(ref_list)}
-        
+
         # Build list of all available (cid, sample_idx) pairs
         self.samples = []
         print("Building sample list from mapping...")
@@ -30,10 +30,10 @@ class XRDDataGenerator(Sequence):
             # Assume each cid has up to 20 samples
             for s_idx in range(20):
                 fname = f"crystal_{cid}_sample_{s_idx:02d}.npz"
-                # Check existence once or trust the directory? 
+                # Check existence once or trust the directory?
                 # Checking 2M files is slow, let's just use the ones we found earlier
                 self.samples.append((cid, s_idx, self.ref_to_index[ref]))
-        
+
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.on_epoch_end()
@@ -81,7 +81,7 @@ def main():
 
     with open(MAPPING_PATH, 'rb') as f:
         id_to_ref = pickle.load(f)
-    
+
     # Classes must be consistent with autoXRD (sorted References)
     REF_DIR = 'Novel-Space/References'
     ref_list = sorted([f for f in os.listdir(REF_DIR) if f.endswith('.cif')])
@@ -100,12 +100,12 @@ def main():
 
     train_gen = XRDDataGenerator(train_id_to_ref, ref_list, batch_size=BATCH_SIZE)
     val_gen = XRDDataGenerator(val_id_to_ref, ref_list, batch_size=BATCH_SIZE)
-  
+
     print("Building model...")
     # Redefine model architecture here to match autoXRD's architecture
     from tensorflow.keras.models import Sequential
     from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, BatchNormalization, Input
-    
+
     model = Sequential([
         Input(shape=(TARGET_LENGTH, 1)),
         Conv1D(31, 100, strides=5, padding='same', activation='relu'),
@@ -123,7 +123,7 @@ def main():
         cnn.CustomDropout(0.7),
         Dense(num_classes, activation='softmax')
     ])
-    
+
     model.compile(
         loss='sparse_categorical_crossentropy',
         optimizer='adam',

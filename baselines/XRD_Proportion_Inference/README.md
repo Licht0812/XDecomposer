@@ -1,15 +1,13 @@
 # Deep neural network method for mineral phases quantification using XRD patterns
 MAJ [2] We propose new work based on vision transformers that improves these results on the analysis of XRD patterns.
 
-
 ## Abstract
-[1] We propose a method to quantify the mineral phases of a material sample using the X-Ray diffraction patterns. 
-This is a two steps method. 
-1. We first train a Neural Network (NN) using synthetic data. 
-1. Then, recovering the trained NN we are able to test the method with 32 experimental data. 
+[1] We propose a method to quantify the mineral phases of a material sample using the X-Ray diffraction patterns.
+This is a two steps method.
+1. We first train a Neural Network (NN) using synthetic data.
+1. Then, recovering the trained NN we are able to test the method with 32 experimental data.
 
 ![Abstract](./Figures/Abstract.svg)
-
 
 ## Prerequisites
 
@@ -20,7 +18,7 @@ This is a two steps method.
 
 ## Getting started
 
-### 1 - Clone repository 
+### 1 - Clone repository
 ```
 git clone https://github.com/titouansimonnet/XRD_Proportion_Inference
 
@@ -34,13 +32,12 @@ cd XRD_Proportion_Inference
   - Simulation_XRD_patterns
   - Neural_network
 
-
 ### 2 -  Set environnement
-We use a local conda virtual environnement 
+We use a local conda virtual environnement
 
 ```
 conda create -n XRD
-source activate XRD 
+source activate XRD
 ```
 
 Install dependencies
@@ -60,13 +57,13 @@ python -m vend XRD
 
 ## Use the code
 
-The databases used in the article are available. They include synthetic single phases, multicoumpounds and 32 experimental XRD patterns. 
+The databases used in the article are available. They include synthetic single phases, multicoumpounds and 32 experimental XRD patterns.
 
 ```
 cd Neural_network
 ```
 
-In the Neural_network folder you will find the test.py file. It allows to test the trained (on synthetic database) Neural Network available in the same folder (NN_trained_database2). This network is trained as presented in the article. 
+In the Neural_network folder you will find the test.py file. It allows to test the trained (on synthetic database) Neural Network available in the same folder (NN_trained_database2). This network is trained as presented in the article.
 
 Path needs to be change !
 
@@ -74,12 +71,11 @@ Path needs to be change !
 python test.py
 ```
 
-In the same way, the test_experimental.py file allows to test the trained NN on the 32 experimental data. 
+In the same way, the test_experimental.py file allows to test the trained NN on the 32 experimental data.
 
 ```
 python test_experimental.py
 ```
-
 
 ## Train the Neural network yourself
 ### 1 - Generate synthetic single phase XRD patterns
@@ -104,11 +100,9 @@ python Mix_data.py
 python Norm.py
 ```
 
-
-Then, create linear mixture of single phase XRD patterns in order to create synthetic database with multicompounds XRD patterns. 
+Then, create linear mixture of single phase XRD patterns in order to create synthetic database with multicompounds XRD patterns.
 Train, validation and test set can be generate using the Python code.
 The synthetic data need to be normalize with maximum = 1 before to train the NN.
-
 
 ### 3 - Train the Neural Network
 
@@ -120,7 +114,7 @@ cd Neural_network
 python train.py
 ```
 
-## Citation 
+## Citation
 
-[1] **Phase quantification using deep neural network processing of XRD patterns**, Titouan Simonnet,  Sylvain Grangeon,  Francis Claret,  Nicolas Maubec,  Diarra Fall,  Rachid Harba and  Bruno Galerne, 2023 31st European Signal Processing Conference (EUSIPCO).  
+[1] **Phase quantification using deep neural network processing of XRD patterns**, Titouan Simonnet,  Sylvain Grangeon,  Francis Claret,  Nicolas Maubec,  Diarra Fall,  Rachid Harba and  Bruno Galerne, 2023 31st European Signal Processing Conference (EUSIPCO).
 [2] **Vision Transformers for X-ray Diffraction Patterns Analysis** Titouan Simonnet, Mame Diarra Fall, Sylvain Grangeon and Bruno Galerne  ICASSP 2025-2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP). IEEE, 2025. p. 1-5.

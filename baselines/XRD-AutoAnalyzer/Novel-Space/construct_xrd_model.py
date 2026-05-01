@@ -13,7 +13,6 @@ else:
     # Disable XLA JIT to avoid PTX version mismatch if driver is older than TF requirements
     os.environ['TF_XLA_FLAGS'] = '--tf_xla_auto_jit=-1'
 
-
 if __name__ == '__main__':
 
     max_texture = 0.5 # default: texture associated with up to +/- 50% changes in peak intensities
@@ -91,14 +90,14 @@ if __name__ == '__main__':
                 # Use occupancy_tolerance to be consistent with autoXRD
                 parser = CifParser(os.path.join(cif_dir, f), occupancy_tolerance=1.25)
                 struc = parser.parse_structures(primitive=False)[0]
-                
+
                 # Check for ordered structures if requested
                 if enforce_order and not struc.is_ordered:
                     continue
 
                 # Use tabulate_cifs.write_cifs to ensure naming consistency (Formula_SpaceGroup.cif)
                 tabulate_cifs.write_cifs([struc], ref_dir, include_elems)
-                
+
             except Exception:
                 continue
         print(f"References generated in {ref_dir}. Total processed: {total_files}")

@@ -2,8 +2,8 @@ import numpy as np
 import os
 import ase.db
 
-db_path = '/data/group/project1/Crystal/UniqCryLabeled.db'
-npz_dir = '/data/group/project1/Crystal/UniqCry'
+db_path = 'data/UniqCryLabeled.db'
+npz_dir = 'data/UniqCry'
 
 # Scan files
 id_to_paths = {}
@@ -28,7 +28,7 @@ for row in db.select():
     label = getattr(row, 'Label')
     sys_id = row.id
     total_labels += 1
-    
+
     if sys_id in id_to_paths:
         checked_labels += 1
         all_bad = True

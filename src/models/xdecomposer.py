@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class ConvBlock(nn.Module):
     """Conv-BN-GELU block."""
 
@@ -16,7 +15,6 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         return self.act(self.bn(self.conv(x)))
-
 
 class DeconvBlock(nn.Module):
     """Deconv-BN-GELU block."""
@@ -36,7 +34,6 @@ class DeconvBlock(nn.Module):
 
     def forward(self, x):
         return self.act(self.bn(self.deconv(x)))
-
 
 class PhaseQueryHead(nn.Module):
     """Phase query head."""
@@ -62,7 +59,6 @@ class PhaseQueryHead(nn.Module):
         logits = self.classifier(latent).squeeze(-1)
         gamma, beta = self.latent_proj(latent).chunk(2, dim=-1)
         return logits, gamma, beta
-
 
 class XDecomposer(nn.Module):
     """FiLM-based XRD decomposition model."""
@@ -233,7 +229,6 @@ class XDecomposer(nn.Module):
             out = input_mix * mask
 
         return out, activity_logits
-
 
 def build_xdecomposer(
     pretrained_mae,

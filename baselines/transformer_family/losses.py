@@ -18,7 +18,6 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
-
 def _match_source_count(pred: Tensor, target: Tensor) -> Tensor:
     num_sources = pred.shape[1]
     if target.shape[1] == num_sources:
@@ -36,7 +35,6 @@ def _match_source_count(pred: Tensor, target: Tensor) -> Tensor:
     )
     return torch.cat([target, padding], dim=1)
 
-
 def calculate_pit_loss(pred: Tensor, target: Tensor) -> tuple[Tensor, Tensor]:
     """Permutation-invariant plain L1 source separation loss."""
     batch_size, num_sources, _ = pred.shape
@@ -53,7 +51,6 @@ def calculate_pit_loss(pred: Tensor, target: Tensor) -> tuple[Tensor, Tensor]:
     best_perms = perms_tensor[min_indices]
     return min_loss.mean(), best_perms
 
-
 def calculate_activity_loss(
     activity_logits: Tensor,
     targets: Tensor,
@@ -67,7 +64,6 @@ def calculate_activity_loss(
     activity_loss = F.binary_cross_entropy_with_logits(activity_logits, aligned_activity)
     return activity_loss, aligned_activity
 
-
 def calculate_mixture_l1_loss(pred: Tensor, mixture_ref: Tensor) -> Tensor:
     """Plain L1 between summed predicted sources and the input mixture."""
     if mixture_ref.dim() == 3:
@@ -75,7 +71,6 @@ def calculate_mixture_l1_loss(pred: Tensor, mixture_ref: Tensor) -> Tensor:
             raise ValueError(f"Expected mixture_ref [B, 1, L], got {mixture_ref.shape}")
         mixture_ref = mixture_ref.squeeze(1)
     return torch.abs(pred.sum(dim=1) - mixture_ref).mean()
-
 
 def calculate_baseline_loss(
     pred: Tensor,
@@ -96,7 +91,6 @@ def calculate_baseline_loss(
         loss_parts["mixture_loss"] = mixture_loss
     return total_loss, best_perms, loss_parts, aligned_activity
 
-
 def calculate_pairwise_sisdr(pred: Tensor, target: Tensor, eps: float = 1e-8) -> Tensor:
     """Pairwise SI-SDR for reporting only."""
     target = _match_source_count(pred, target)
@@ -114,7 +108,6 @@ def calculate_pairwise_sisdr(pred: Tensor, target: Tensor, eps: float = 1e-8) ->
     sisdr = 10 * torch.log10((signal_energy + eps) / noise_energy)
     target_is_silent = target_energy < 1e-6
     return torch.where(target_is_silent.expand_as(sisdr), torch.zeros_like(sisdr), sisdr)
-
 
 def calculate_pit_sisdr(pred: Tensor, target: Tensor) -> float:
     """Average best-permutation SI-SDR for validation reporting."""

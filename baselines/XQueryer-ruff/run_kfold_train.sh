@@ -1,19 +1,19 @@
 #!/bin/bash
 #SBATCH --job-name=xrd_kfold_train
-#SBATCH --partition=project1
+#SBATCH --partition=your-partition
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:1
 
-# 环境加载
+# Load the environment
 module load miniconda
 source activate xrd
 
-# 设置 Python 路径
+# Set PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-DB_PATH="/data/group/project1/Crystal/UniqRruffCrystal.db"
+DB_PATH="data/UniqRruffCrystal.db"
 NUM_FOLDS=5
 EPOCHS=100
 

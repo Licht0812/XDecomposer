@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J transformer_sep
-#SBATCH -p project1
-#SBATCH -A project1
+#SBATCH -p your-partition
+#SBATCH -A your-account
 #SBATCH -o logs/transformer_%j.out
 #SBATCH -e logs/transformer_%j.err
 set -euo pipefail

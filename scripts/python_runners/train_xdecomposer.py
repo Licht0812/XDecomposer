@@ -28,7 +28,6 @@ from src.utils.metrics import calculate_peak_position_metrics_batch
 from src.utils.optimization import NoamScheduler, get_cosine_schedule_with_warmup
 from src.utils.run_outputs import current_timestamp, ensure_timestamp_dir, with_run_timestamp
 
-
 def visualize_predictions(model, dataset, device, rank, epoch, save_dir, run_timestamp, num_samples=2):
     model.eval()
     if rank != 0:
@@ -98,7 +97,6 @@ def visualize_predictions(model, dataset, device, rank, epoch, save_dir, run_tim
     plt.savefig(os.path.join(save_dir, f"vis_epoch_{epoch + 1:04d}_{run_timestamp}.png"))
     plt.close()
 
-
 def validate_model(model, val_loader, device, rank, lambda_sisdr=0.1):
     model.eval()
     accumulated = {
@@ -160,7 +158,6 @@ def validate_model(model, val_loader, device, rank, lambda_sisdr=0.1):
 
     return {key: value / max(1, steps) for key, value in accumulated.items()}
 
-
 def resolve_num_workers(requested_workers: int, world_size: int) -> int:
     if requested_workers > 0:
         return requested_workers
@@ -172,7 +169,6 @@ def resolve_num_workers(requested_workers: int, world_size: int) -> int:
 
     per_rank_budget = max(1, available_cpus // max(1, world_size))
     return max(1, min(8, per_rank_budget))
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train XDecomposer")
@@ -216,7 +212,6 @@ def parse_args():
     parser.add_argument("--config", type=str, default=None)
     return parser.parse_args()
 
-
 def apply_ablation_config(args):
     if not args.config:
         return args
@@ -240,7 +235,6 @@ def apply_ablation_config(args):
 
     return args
 
-
 def prepare_output_dir(args):
     if args.resume:
         args.save_dir = os.path.dirname(os.path.abspath(args.resume))
@@ -249,7 +243,6 @@ def prepare_output_dir(args):
 
     args.save_dir, args.run_timestamp = ensure_timestamp_dir(args.save_dir)
     return args
-
 
 def main():
     args = prepare_output_dir(apply_ablation_config(parse_args()))
@@ -523,7 +516,6 @@ def main():
                 )
 
     cleanup_ddp()
-
 
 if __name__ == "__main__":
     main()

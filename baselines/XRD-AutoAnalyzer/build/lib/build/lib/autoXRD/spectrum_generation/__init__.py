@@ -8,7 +8,6 @@ import numpy as np
 import math
 import os
 
-
 class SpectraGenerator(object):
     """
     Class used to generate augmented xrd spectra

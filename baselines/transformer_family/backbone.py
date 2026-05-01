@@ -12,12 +12,10 @@ from torch import Tensor
 
 from src.models.xrd_transformer import XRDMaskedAutoencoder
 
-
 def strip_module_prefix(state_dict: Dict[str, Tensor]) -> Dict[str, Tensor]:
     if not any(k.startswith("module.") for k in state_dict):
         return state_dict
     return {k[7:] if k.startswith("module.") else k: v for k, v in state_dict.items()}
-
 
 def load_mae_checkpoint(path: str) -> Dict[str, Any]:
     checkpoint = torch.load(path, map_location="cpu")
@@ -25,14 +23,12 @@ def load_mae_checkpoint(path: str) -> Dict[str, Any]:
         return checkpoint
     return {"model_state_dict": checkpoint, "config": {}}
 
-
 def merge_mae_config(checkpoint: Dict[str, Any], overrides: Dict[str, Any]) -> Dict[str, Any]:
     config = dict(checkpoint.get("config", {}) or {})
     for key, value in overrides.items():
         if value is not None:
             config[key] = value
     return config
-
 
 def unpatchify_1d(
     patches: Tensor,
@@ -84,7 +80,6 @@ def unpatchify_1d(
     if original_dim == 4:
         output = output.reshape(batch_size, num_sources, xrd_length)
     return output
-
 
 class PretrainedXRDBackbone(nn.Module):
     """Deterministic MAE encoder-side feature extractor."""

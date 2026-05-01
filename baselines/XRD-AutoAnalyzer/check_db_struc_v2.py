@@ -9,18 +9,18 @@ def get_structure_from_db(db_path, cid):
     cur.execute("SELECT numbers, positions, cell FROM systems WHERE id=?", (cid,))
     row = cur.fetchone()
     conn.close()
-    
+
     if row:
         numbers = np.frombuffer(row[0], dtype=np.int32) # Try int32
         positions = np.frombuffer(row[1], dtype=np.float64).reshape(-1, 3) # float64
         cell = np.frombuffer(row[2], dtype=np.float64).reshape(3, 3) # float64
-        
+
         lattice = Lattice(cell)
         structure = Structure(lattice, numbers, positions)
         return structure
     return None
 
-db_path = '/data/group/project1/Crystal/UniqCryLabeled.db'
+db_path = 'data/UniqCryLabeled.db'
 cid = 8604
 struc = get_structure_from_db(db_path, cid)
 if struc:

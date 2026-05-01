@@ -4,7 +4,6 @@ import sys
 from tensorboardX import SummaryWriter
 from datetime import datetime
 
-
 class Logger(object):
     def __init__(self, val=True, filename="print.log"):
         self.Time = datetime.now().strftime('%Y-%m-%d_%H%M')

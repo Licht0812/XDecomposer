@@ -9,7 +9,6 @@ import random
 import math
 import os
 
-
 class MixedGen(object):
     """
     Class used to apply stochastic, symmetry-preserving sets of
@@ -341,7 +340,6 @@ class MixedGen(object):
         form_signal = [[val] for val in noisy_signal]
 
         return form_signal
-
 
 def main(struc, num_specs, max_shift, max_strain, min_domain_size, max_domain_size, max_texture, impur_amt, min_angle=10.0, max_angle=80.0):
 

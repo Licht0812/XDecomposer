@@ -20,7 +20,6 @@ import os
 import re
 import copy
 
-
 common_oxi = {
     'H': [1, -1],  # Hydrogen
     'He': [0],  # Helium
@@ -612,7 +611,6 @@ class StructureFilter(object):
 
         return filtered_cmpds
 
-
 def oxi_filter(cif_dir):
     """
     Removes any reference compounds that have
@@ -654,7 +652,6 @@ def oxi_filter(cif_dir):
 
         if not oxi_okay:
             os.remove('%s/%s' % (cif_dir, filename))
-
 
 def write_cifs(unique_strucs, dir, include_elems):
     """

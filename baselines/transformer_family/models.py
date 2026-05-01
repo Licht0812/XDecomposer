@@ -11,7 +11,6 @@ from .itransformer import ITransformerBaseline
 from .patchtst import PatchTSTBaseline
 from .transformer import TransformerBaseline
 
-
 def build_transformer_family_baseline(
     name: str,
     mae_checkpoint: str,
@@ -75,10 +74,8 @@ def build_transformer_family_baseline(
         )
     raise ValueError(f"Unknown baseline '{name}'. Choose from transformer, itransformer, patchtst.")
 
-
 # Backward-compatible short alias used by existing train/eval runners.
 build_baseline = build_transformer_family_baseline
-
 
 __all__ = [
     "ITransformerBaseline",

@@ -196,7 +196,6 @@ class StrainGen(object):
 
         return form_signal
 
-
 def main(struc, num_strains, max_strain, min_angle=10.0, max_angle=80.0):
 
     strain_generator = StrainGen(struc, max_strain, min_angle, max_angle)

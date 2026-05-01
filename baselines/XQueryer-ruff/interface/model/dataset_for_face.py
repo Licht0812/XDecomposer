@@ -8,7 +8,6 @@ import ase
 import random
 import ast
 
-
 # In case of conflict, use this file for interface.
 class EXPDataset(Dataset):
     def __init__(self, db_paths,encode_element):
@@ -24,7 +23,7 @@ class EXPDataset(Dataset):
         return total_length
 
     def __getitem__(self, idx):
-        
+
         cumulative_length = 0
         for i, db in enumerate(self.dbs):
             if idx < cumulative_length + len(db):
@@ -44,12 +43,12 @@ class EXPDataset(Dataset):
                     # mean pooling
                     element_value=torch.mean(torch.tensor(element_value, dtype=torch.float32),dim=0)
                 # Extract relevant data from the row
-         
+
                 latt_dis = ast.literal_eval(getattr(row, 'angle'))
                 intensity = ast.literal_eval(getattr(row, 'intensity'))
 
                 """
-                提前过滤数据,删除不对齐的情况
+                Filter misaligned samples early.
                 min_length = min(len(latt_dis), len(intensity))
                 latt_dis = latt_dis[:min_length]
                 intensity = intensity[:min_length]
@@ -58,7 +57,7 @@ class EXPDataset(Dataset):
                 int_int = self.upsample(np.column_stack((latt_dis, intensity)))
                 # the str ID of RRUFF database
                 id_num = adjusted_idx +1 # adjusted_idx +1 is the real data index in RRUFF database
-                
+
                 # Convert to tensors
                 #tensor_latt_dis = torch.tensor(latt_dis, dtype=torch.float32)
                 tensor_intensity = torch.tensor(int_int, dtype=torch.float32)
@@ -76,7 +75,7 @@ class EXPDataset(Dataset):
                         'intensity': tensor_intensity,
                         'id': tensor_id,
                         'element': torch.zeros(92, dtype=torch.int)
-                    }              
+                    }
             cumulative_length += len(db)
 
     def symbol_to_atomic_number(self,symbol_list):
@@ -107,7 +106,7 @@ class EXPDataset(Dataset):
             'Rg': 111, 'Cn': 112, 'Nh': 113, 'Fl': 114, 'Mc': 115,
             'Lv': 116, 'Ts': 117, 'Og': 118
         }
-        
+
         atomic_number_list = []
         if symbol_list == []: atomic_number_list.append(0)
         else:
@@ -116,30 +115,30 @@ class EXPDataset(Dataset):
                     atomic_number_list.append(atomic_numbers[symbol])
                 else:
                     atomic_number_list.append(0)  # Append None if symbol not in the dictionary
-            
+
         return atomic_number_list
-    
+
     def upsample(self, rows):
-        # 将 rows 转换为 NumPy 数组，并确保数据类型正确
+        # Convert rows to a NumPy array
         rows = np.array(rows, dtype=object)
-        # 删除第一列相同的行，只保留第一次出现的
+        # Keep the first row for each x value
         _, unique_indices = np.unique(rows[:, 0], return_index=True)
         rows = rows[unique_indices]
-        # 检查第一个元素并插入新元素（如果需要）
+        # Pad the first sample if needed
         if float(rows[0][0]) > 10:
             rows = np.insert(rows, 0, ['10', float(rows[0][1])], axis=0)
-        # 检查最后一个元素并追加新元素（如果需要）
+        # Pad the last sample if needed
         if float(rows[-1][0]) < 80:
             rows = np.append(rows, [['80', float(rows[-1][1])]], axis=0)
-        # 将字符串转换为浮点数
+        # Convert strings to floats
         rowsData = np.array(rows, dtype=np.float32)
         x = rowsData[:, 0].astype(np.float32)
         y = rowsData[:, 1].astype(np.float32)
-        # 创建插值函数
+        # Build the interpolator
         f = interp1d(x, y, kind='slinear', fill_value="extrapolate")
-        # 定义新的 x 值范围
+        # Build the target x grid
         xnew = np.linspace(10, 80, 3501)
-        # 进行插值
+        # Interpolate onto the target grid
         ynew = f(xnew)
 
         return ynew

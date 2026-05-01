@@ -11,7 +11,7 @@ import pickle
 import warnings
 import matplotlib.transforms as mtransforms
 from torch.utils.data import DataLoader
-from scipy.optimize import linear_sum_assignment, nnls  # 新增 nnls 导入
+from scipy.optimize import linear_sum_assignment, nnls
 from data_utils import get_dataloaders, OnlineMixingConfig
 from model import get_model
 
@@ -23,7 +23,6 @@ try:
     xrd_calc = XRDCalculator(wavelength='CuKa')
 except ImportError:
     xrd_calc = None
-
 
 def setup_plot_style():
     plt.rcParams.update({
@@ -37,28 +36,24 @@ def setup_plot_style():
         'legend.frameon': False
     })
 
-
 def format_chem(chem):
     if isinstance(chem, (int, float)):
         chem = str(chem)
     clean_name = str(chem).replace(".cif", "").split('_')[0].replace("_", "\\_")
     return "$\mathrm{" + re.sub(r'(\d+)', r'_{\1}', clean_name) + "}$"
 
-
-def get_cif_path(mpid, cif_base_dir="/data/group/project1/Crystal/UniqCry/cif_files"):
+def get_cif_path(mpid, cif_base_dir="data/cif_files"):
     if not mpid or mpid == "Unknown":
         return None
     cif_path = os.path.join(cif_base_dir, f"{mpid}.cif")
     return cif_path if os.path.exists(cif_path) else None
 
-
 def get_name_mapping():
-    mapping_path = "/data/home/zdhs0019/Projects/xrd_baselines/XRD-AutoAnalyzer/id_to_ref_mapping_full.pkl"
+    mapping_path = "data/id_to_ref_mapping_full.pkl"
     if os.path.exists(mapping_path):
         with open(mapping_path, 'rb') as f:
             return pickle.load(f)
     return {}
-
 
 def build_reference_library(test_loader, device):
     print("Building reference library from test set IDs...")
@@ -80,9 +75,8 @@ def build_reference_library(test_loader, device):
     print(f"Reference library built with {len(ref_ids)} unique crystal types.")
     return ref_patterns.to(device), ref_ids
 
-
 def visualize(model, test_loader, device, ref_lib, ref_ids, entries_dict, save_dir='plots',
-              cif_base_dir="/data/group/project1/Crystal/UniqCry/cif_files"):
+              cif_base_dir="data/cif_files"):
     os.makedirs(save_dir, exist_ok=True)
     setup_plot_style()
     model.eval()
@@ -114,11 +108,10 @@ def visualize(model, test_loader, device, ref_lib, ref_ids, entries_dict, save_d
         targets = batch['single_xrds'].to(device)
         phase_ids = batch['phase_ids'].to(device)
         weights = batch['weights'].to(device)
-        
+
         with torch.no_grad():
             outputs = model(inputs)  # [1, 4, 3500]
 
-        # --- 修复点1: 截断负数强度 ---
         pred_xrds = outputs[0].cpu().clamp(min=0)  # [4, 3500]
         gt_xrds = targets[0].cpu()  # [K, 3500]
         gt_ratios = weights[0].cpu()  # [K]
@@ -127,29 +120,27 @@ def visualize(model, test_loader, device, ref_lib, ref_ids, entries_dict, save_d
         valid_gt_mask = gt_ratios > 1e-6
         mixed_input_np = inputs[0, 0].cpu().numpy()
 
-        # --- 修复点2: 使用 NNLS (非负最小二乘) 计算预测比例 ---
         P = pred_xrds.numpy().T  # shape (3500, 4)
         y = mixed_input_np        # shape (3500,)
-        
-        # 求解非负权重
+
+        # Solve non-negative weights
         from scipy.optimize import nnls
         w_nnls, _ = nnls(P, y)
-        # 归一化到比例和为1
+        # Normalize ratios
         pred_ratios = torch.from_numpy(w_nnls / (w_nnls.sum() + 1e-8))
 
         num_slots = pred_xrds.shape[0]
 
-        # --- 修复点4: 匈牙利匹配 (使用归一化后的谱图) ---
         def normalize_pattern(pattern):
             max_val = pattern.max()
             return pattern / max_val if max_val > 1e-8 else pattern
 
-        # 预测谱和GT谱都做归一化，仅对比峰形
+        # Compare normalized peak shapes
         pred_xrds_norm = torch.stack([normalize_pattern(x) for x in pred_xrds])
         gt_xrds_valid = gt_xrds[valid_gt_mask]
         gt_xrds_norm = torch.stack([normalize_pattern(x) for x in gt_xrds_valid])
 
-        # 计算距离矩阵并匹配
+        # Compute the distance matrix
         cost_matrix = torch.cdist(pred_xrds_norm.float(), gt_xrds_norm.float(), p=2).numpy()
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
         matched_slots = set(row_ind)
@@ -197,7 +188,6 @@ def visualize(model, test_loader, device, ref_lib, ref_ids, entries_dict, save_d
         # Sort slots: Matched first (sorted by GT ratio), then unmatched
         slot_data.sort(key=lambda x: x['gt']['ratio'] if x['gt'] else -1, reverse=True)
 
-        # --- 修复点5: 重构谱图计算 (纯相 * 比例) ---
         reconstructed_y = np.zeros(3500)
         for data in slot_data:
             reconstructed_y += data['p_xrd'] * data['p_ratio']
@@ -225,10 +215,9 @@ def visualize(model, test_loader, device, ref_lib, ref_ids, entries_dict, save_d
         ax_mix.legend(loc="upper right", frameon=True, edgecolor='black').get_frame().set_linewidth(0.5)
         ax_mix.set_title("Overall Mixture and Residual", fontsize=16)
 
-        # --- 修复点6: 自适应 Y 轴范围 ---
         y_max = max(np.max(mixed_input_norm), np.max(reconstructed_norm))
         ax_mix.set(xlim=(10, 80), xticks=[10, 20, 30, 40, 50, 60, 70, 80],
-                   ylim=(-0.02, y_max * 1.1), 
+                   ylim=(-0.02, y_max * 1.1),
                    yticks=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
         ax_mix.tick_params(axis='both', direction='in', top=False, right=False, labelbottom=False)
         for spine in ax_mix.spines.values():
@@ -255,7 +244,7 @@ def visualize(model, test_loader, device, ref_lib, ref_ids, entries_dict, save_d
             gt_scaled = slot_data['gt']['xrd'] / max_val if slot_data['gt'] else np.zeros(3500)
             # Pred is also already scaled by the model (it predicts mixed components)
             pred_scaled = slot_data['p_xrd'] / max_val
-            
+
             gt_w = slot_data['gt']['ratio'] if slot_data['gt'] else 0
             pred_w = slot_data['p_ratio']
 
@@ -301,26 +290,25 @@ def visualize(model, test_loader, device, ref_lib, ref_ids, entries_dict, save_d
             is_last = (i == num_slots - 1)
             plot_component(ax_c, slot_data[i], colors_pred_palette[i % len(colors_pred_palette)], is_last)
             comp_axes.append(ax_c)
-            
+
         plt.subplots_adjust(left=0.09, right=0.92, top=0.94, bottom=0.10, wspace=0.10)
         save_path = os.path.join(save_dir, f'vis_{n_phase}phase_sample.pdf')
         plt.savefig(save_path, format='pdf', bbox_inches='tight', dpi=600)
         print(f'Saved visualization to {save_path}')
         plt.close()
 
-
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
     default_model_path = os.path.join(script_dir, '..', 'best_separation_model.pth')
     default_plots_dir = os.path.join(script_dir, '..', 'plots')
-    
+
     parser.add_argument('--load_path', default=default_model_path, type=str)
-    parser.add_argument('--db_path', default='/data/group/project1/Crystal/UniqCry/mp20-xrd_data', type=str)
-    parser.add_argument('--entries_dict', default='/data/home/zdhs0019/Projects/xrd_baselines/XQueryer/src/entries_dict.json', type=str)
-    parser.add_argument('--cif_base_dir', default="/data/group/project1/Crystal/UniqCry/cif_files", type=str)
+    parser.add_argument('--db_path', default='data/mp20-xrd_data', type=str)
+    parser.add_argument('--entries_dict', default='../XQueryer/src/entries_dict.json', type=str)
+    parser.add_argument('--cif_base_dir', default="data/cif_files", type=str)
     parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     args = parser.parse_args()
@@ -330,7 +318,7 @@ if __name__ == '__main__':
     with open(args.entries_dict, 'r') as f:
         entries_dict = json.load(f)
     print(f"Loaded crystal entries from {args.entries_dict}")
-    
+
     config = OnlineMixingConfig(
         MIN_K=2,
         MAX_K=4,

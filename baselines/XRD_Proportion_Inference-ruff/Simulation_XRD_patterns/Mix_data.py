@@ -19,7 +19,6 @@ This function takes a list of crystals as input parameters and generates a rando
 - path : path to put the multiphases XRD files
 """
 
-
 def mix(list_cristal,N,data,a_min,a_max,data_size,num,fichier_label,path):
     percent = np.zeros(N)
     Intensity = np.zeros(shape = (data_size,N))
@@ -31,14 +30,13 @@ def mix(list_cristal,N,data,a_min,a_max,data_size,num,fichier_label,path):
 
     percent = percent / sum(percent)
     percent = np.around(percent,2)
-    
+
     composant = random.sample(list_cristal,N)
 
     num = num
     melange = open(path+'Mix'+str(num)+'.txt',mode='w')
     fichier_label.write('Mix'+str(num)+'.txt,')
 
-    
     for j in range(len(list_cristal)):
         present = 'no'
         for i in range(N):
@@ -50,9 +48,9 @@ def mix(list_cristal,N,data,a_min,a_max,data_size,num,fichier_label,path):
         if (present == 'no'):
             melange.write('N :' + list_cristal[j] + '\n')
             fichier_label.write('0,')
-    
+
     fichier_label.write('\n')
-    
+
     for i in range(N):
         a = int(num_diffracto[i])
         cristal = open("""path_single TO DO""" + composant[i]+str(a)+'.txt', mode='r')
@@ -63,12 +61,10 @@ def mix(list_cristal,N,data,a_min,a_max,data_size,num,fichier_label,path):
                 continue
             Intensity[j,i] = float(line)
             j = j + 1
-        
+
         I = I + Intensity[:,i]*percent[i]
     for i in range(len(Intensity)):
         melange.write(str(I[i]) + '\n')
-        
-
 
 list_cristal = ['Calcite','Gibbsite','Dolomite','Hematite']
 path = """TODO"""
@@ -79,9 +75,8 @@ a_max = 1000 # Files 1 -> 1000 to create training set
 long = 10000 # Number of multiphase XRD patterns we want to generate
 data = 'train' #Trainset
 
-
 for i in range(long):
     N = np.random.randint(1,5) # Mix from 1 to 3 single signals
     mix(list_cristal = list_cristal, N = N,data = data,a_min = a_min,a_max = a_max, data_size = 2905,num = num,fichier_label = label, path = path)
     num = num + 1
-        
+

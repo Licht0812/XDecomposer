@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=xrd_kfold_eval
-#SBATCH --partition=project1
+#SBATCH --partition=your-partition
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
@@ -10,12 +10,12 @@ module load miniconda
 source activate xrd
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-DB_PATH="/data/group/project1/Crystal/UniqRruffCrystal.db"
+DB_PATH="data/UniqRruffCrystal.db"
 NUM_FOLDS=5
 NUM_CLASSES=100315
 
 # Modify this array to match the output paths from your training run
-# Example: 
+# Example:
 # CHECKPOINTS=(
 #     "output/fold_0/model_best.pth"
 #     "output/fold_1/model_best.pth"
@@ -59,7 +59,7 @@ for phase in 2 3 4; do
     echo "==========================================="
     echo "🧪 Evaluating for ${phase} phases"
     echo "==========================================="
-    
+
     for fold in $(seq 0 $((NUM_FOLDS-1))); do
         echo "Evaluating Fold ${fold}..."
         python -u src/infer.py \

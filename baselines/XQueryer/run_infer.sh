@@ -1,24 +1,23 @@
 #!/bin/bash
 #SBATCH --job-name=xrd_infer
-#SBATCH --partition=project1
+#SBATCH --partition=your-partition
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
-#SBATCH --gres=gpu:1             # 申请单卡 GPU
+#SBATCH --gres=gpu:1
 
-# 环境加载
+# Load the environment
 module load miniconda
 source activate xrd
 
-# 设置 Python 路径
+# Set PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-# 设置模型加载路径，用户可以根据需要修改
-LOAD_PATH="/data/home/zdhs0019/Projects/xrd_baselines/XQueryer/output/2026-03-24_1725/checkpoints/checkpoint_0010.pth"
+# Set the checkpoint path
+LOAD_PATH="checkpoints/xqueryer/latest.pth"
 
-# 执行推理脚本
-# -u 参数确保输出实时刷新到日志文件
-# limit 0 表示评估全部数据，或者设置一个小数值（如 100）进行快速测试
+# Keep logs unbuffered
+# Use 0 to evaluate the full set
 
 echo "Starting inference at $(date)"
 

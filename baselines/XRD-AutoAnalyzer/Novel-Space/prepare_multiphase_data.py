@@ -19,16 +19,16 @@ TARGET_LENGTH = 3500
 MIN_ANGLE = 10.0
 MAX_ANGLE = 80.0
 
-DB_PATH = '/data/group/project1/Crystal/UniqCryLabeled.db'
-NPZ_DIR = '/data/group/project1/Crystal/UniqCry/mp20-xrd_data/data'
+DB_PATH = 'data/UniqCryLabeled.db'
+NPZ_DIR = 'data/mp20-xrd_data/data'
 OUTPUT_DIR = 'Multiphase_Data'
 
 def load_crystal_info():
     """Load crystal ID and their corresponding spectrum file paths from directory."""
-    # Since the DB doesn't directly map to the npz files we found, 
+    # Since the DB doesn't directly map to the npz files we found,
     # and the files are named crystal_{id}_sample_{idx}.npz,
     # we scan the directory to build the mapping.
-    
+
     print("Scanning directory for npz files...")
     crystal_dict = {}
     all_files = os.listdir(NPZ_DIR)
@@ -51,14 +51,14 @@ def preprocess_spectrum(fpath):
     try:
         data = np.load(os.path.join(NPZ_DIR, fpath))
         y = data['y']
-        
+
         # If it's not 3500, interpolate
         if len(y) != TARGET_LENGTH:
             x = data['x']
             f = interp1d(x, y, kind='cubic', fill_value="extrapolate")
             new_x = np.linspace(MIN_ANGLE, MAX_ANGLE, TARGET_LENGTH)
             y = f(new_x)
-        
+
         # Ensure non-negative
         y = np.maximum(y, 0)
         return y
@@ -69,7 +69,7 @@ def preprocess_spectrum(fpath):
 def generate_mixed_data(crystal_ids, crystal_dict, num_samples, split_name):
     """Generate multiphase samples for a given split."""
     os.makedirs(os.path.join(OUTPUT_DIR, split_name), exist_ok=True)
-    
+
     results_x = []
     results_y_labels = []
     results_y_weights = []
@@ -77,7 +77,7 @@ def generate_mixed_data(crystal_ids, crystal_dict, num_samples, split_name):
     for i in tqdm(range(num_samples), desc=f"Generating {split_name}"):
         k = random.randint(MIN_K, MAX_K)
         selected_ids = random.sample(crystal_ids, k)
-        
+
         # Dirichlet sampling for weights with MIN_WEIGHT constraint
         weights = np.zeros(k)
         valid_weights = False
@@ -85,16 +85,16 @@ def generate_mixed_data(crystal_ids, crystal_dict, num_samples, split_name):
             weights = np.random.dirichlet([1.0] * k)
             if np.all(weights >= MIN_WEIGHT):
                 valid_weights = True
-        
+
         mixed_signal = np.zeros(TARGET_LENGTH)
         component_signals = []
-        
+
         for idx, cid in enumerate(selected_ids):
             # Randomly pick one spectrum for this ID
             fpath = random.choice(crystal_dict[cid])
             sig = preprocess_spectrum(fpath)
             if sig is None: continue
-            
+
             # Mix according to weight (no individual normalization, norm_method="none")
             mixed_signal += sig * weights[idx]
             component_signals.append(sig * weights[idx])
@@ -106,22 +106,22 @@ def generate_mixed_data(crystal_ids, crystal_dict, num_samples, split_name):
         if max_val > 0:
             mixed_signal /= max_val
             # All components also divided by the same max_val
-            # component_signals = [s / max_val for s in component_signals] 
+            # component_signals = [s / max_val for s in component_signals]
 
         # Add Gaussian noise relative to max (which is now 1.0)
         noise = np.random.normal(0, 0.01, TARGET_LENGTH) # 1% noise
         mixed_signal += noise
         mixed_signal = np.maximum(mixed_signal, 0)
-        
+
         results_x.append(mixed_signal)
         results_y_labels.append(selected_ids)
         results_y_weights.append(weights)
 
     # Save as npz
     save_path = os.path.join(OUTPUT_DIR, f"{split_name}_data.npz")
-    np.savez(save_path, 
-             x=np.array(results_x), 
-             labels=np.array(results_y_labels, dtype=object), 
+    np.savez(save_path,
+             x=np.array(results_x),
+             labels=np.array(results_y_labels, dtype=object),
              weights=np.array(results_y_weights, dtype=object))
     print(f"Saved {split_name} data to {save_path}")
 
@@ -130,16 +130,16 @@ def main():
     crystal_dict = load_crystal_info()
     all_ids = sorted(list(crystal_dict.keys()))
     random.shuffle(all_ids)
-    
+
     # 8:1:1 Split
     n = len(all_ids)
     train_end = int(n * 0.8)
     val_end = int(n * 0.9)
-    
+
     train_ids = all_ids[:train_end]
     val_ids = all_ids[train_end:val_end]
     test_ids_raw = all_ids[val_end:]
-    
+
     # Filter test_ids to only include those in our reference library mapping
     MAPPING_PATH = 'id_to_ref_mapping_full.pkl'
     if os.path.exists(MAPPING_PATH):
@@ -152,7 +152,7 @@ def main():
         test_ids = test_ids_raw
 
     print(f"IDs: Train={len(train_ids)}, Val={len(val_ids)}, Test={len(test_ids)}")
-    
+
     # Generate data
     generate_mixed_data(train_ids, crystal_dict, 10000, "train")
     generate_mixed_data(val_ids, crystal_dict, 1000, "val")

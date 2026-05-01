@@ -30,10 +30,8 @@ class Xmodel(nn.Module):
         self.slot_tokens = nn.Parameter(torch.zeros(1, num_slots, self.attn_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, self.xrd_length, self.attn_dim), requires_grad=False)
 
-        # -------------encoder----------------
         sa_layer = CrossAttnLayer(self.attn_dim, nhead, self.attn_dim * 2, dropout, activation)
         self.encoder = SelfAttnModule(sa_layer, num_encoder_layers,)
-        # ------------------------------------
 
         self.norm_after = nn.LayerNorm(self.attn_dim)
 
@@ -44,7 +42,7 @@ class Xmodel(nn.Module):
             nn.Linear(self.attn_dim, self.xrd_length),
             nn.Sigmoid()  # Output a mask in [0, 1]
         )
-        
+
         self.ratio_head = nn.Sequential(
             nn.Linear(self.attn_dim, self.attn_dim // 2),
             nn.ReLU(inplace=True),
@@ -79,12 +77,12 @@ class Xmodel(nn.Module):
         x = x[:, :self.xrd_length]
         N = x.shape[0]
         mixture = x
-        
-        sampling_rate = 1.0 
+
+        sampling_rate = 1.0
         x = x.unsqueeze(1) # N*1*3500
-        
+
         # Multi-scale and Frequency filtering
-        x1 = self.conv(x) 
+        x1 = self.conv(x)
         x2 = self.conv(SignalProcessor(x, sampling_rate).filter_high_frequencies(percentage=0.3))
         x3 = self.conv(SignalProcessor(x, sampling_rate).filter_high_frequencies(percentage=0.6))
         x4 = self.conv(SignalProcessor(x, sampling_rate).filter_high_frequencies(percentage=0.9))
@@ -94,16 +92,16 @@ class Xmodel(nn.Module):
         x = x.permute(2, 0, 1).contiguous()  # 3500*N*attn_dim
 
         pos_embed = self.pos_embed.permute(1, 0, 2).contiguous().repeat(1, N, 1)
-        
+
         slots = self.slot_tokens.repeat(N, 1, 1).permute(1, 0, 2).contiguous()  # num_slots, N, attn_dim
         elem = elem.unsqueeze(0).contiguous()  # 1*N*92
 
         feats = self.encoder(slots, pos_embed, elem, keys=x)
         feats = self.norm_after(feats) # num_slots, N, attn_dim
-        
+
         # feats is (num_slots, N, attn_dim), we want (N, num_slots, attn_dim)
         feats = feats.permute(1, 0, 2).contiguous()
-        
+
         # Predict bounded masks and gate them with slot activity.
         pred_masks = self.mask_head(feats)  # N, num_slots, 3500
         slot_gates = torch.sigmoid(self.ratio_head(feats))  # N, num_slots, 1
@@ -113,15 +111,13 @@ class Xmodel(nn.Module):
         pred_ratios = slot_energy / (slot_energy.sum(dim=1, keepdim=True) + 1e-8)
         pred_features = self.feature_head(feats) # N, num_slots, feature_dim
         feat_logits = self.feat_cls_head(pred_features) # N, num_slots, num_classes
-     
+
         return {
             "xrds": pred_xrds,
             "ratios": pred_ratios,
             "features": pred_features,
             "feat_logits": feat_logits
         }
-
-
 
 class ConvModule(nn.Module):
     def __init__(self, drop_rate=0.):
@@ -183,8 +179,6 @@ class ConvModule(nn.Module):
         x6 = self.bn6(x6)
         x6 = self.act6(x6)
 
-
-
         #x = self.maxpool(x)
 
         #x = self.layer1(x)
@@ -193,7 +187,6 @@ class ConvModule(nn.Module):
         #x = self.maxpool2(x)
         return torch.cat((x1, x2, x3, x4, x5, x6), dim=1)
 
-
 class SelfAttnModule(nn.Module):
 
     def __init__(self, encoder_layer, num_layers, norm=None):
@@ -201,7 +194,6 @@ class SelfAttnModule(nn.Module):
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
-   
 
     def forward(self, src, pos, elem, keys):
         output = src
@@ -214,15 +206,14 @@ class SelfAttnModule(nn.Module):
 
         return output
 
-
 class CrossAttnLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
         super().__init__()
         # element_map to incorporate chemical information into the queries
-        self.element_map = nn.Sequential(  
-            nn.Linear(92, d_model),   
-            nn.Dropout(0.1),  
+        self.element_map = nn.Sequential(
+            nn.Linear(92, d_model),
+            nn.Dropout(0.1),
             nn.ReLU(),
         )
 
@@ -243,14 +234,14 @@ class CrossAttnLayer(nn.Module):
         # src: Slot tokens (num_slots, N, embed_dim)
         # elem: Element embedding (1, N, 92)
         # keys: XRD features (768, N, 3500) - Wait, embed_dim is 3500.
-        
+
         # Incorporate element info into slot tokens (Query)
         q_elem = self.element_map(elem) # 1, N, d_model
         q = src + q_elem # num_slots, N, d_model
-        
+
         # Keys and Values are XRD features with positional embedding
         k = v = with_pos_embed(keys, pos)
-        
+
         src2 = self.cross_attn(q, k, value=v)[0]
         src = src + self.dropout1(src2)
         src = self.norm1(src)
@@ -258,8 +249,6 @@ class CrossAttnLayer(nn.Module):
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
-
-
 
 class Layer(nn.Module):
     def __init__(self, inchannel, outchannel, kernel_size, stride, downsample):
@@ -271,7 +260,6 @@ class Layer(nn.Module):
         x = self.block1(x)
         x = self.block2(x)
         return x
-
 
 class BasicBlock(nn.Module):
     def __init__(self, inchannel, outchannel, kernel_size, stride, downsample=False):
@@ -299,10 +287,8 @@ class BasicBlock(nn.Module):
         x = self.act2(x)
         return x
 
-
 def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
-
 
 def _get_activation_fn(activation):
     """Return an activation function given a string"""
@@ -314,10 +300,8 @@ def _get_activation_fn(activation):
         return F.glu
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
-
 def with_pos_embed(tensor, pos):
     return tensor if pos is None else tensor + pos
-
 
 def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     """
@@ -339,8 +323,6 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     emb = np.concatenate([emb_sin, emb_cos], axis=1)  # (M, D)
     return emb
 
-
-
 class SignalProcessor:
     def __init__(self, signals, sampling_rate):
         """
@@ -354,7 +336,7 @@ class SignalProcessor:
         self.sampling_rate = sampling_rate
         self.frequency = torch.fft.fftfreq(signals.shape[-1], d=1/sampling_rate)
         self.fourier_transforms = torch.fft.fft(signals, dim=-1)
-    
+
     def filter_high_frequencies(self, percentage=0.2):
         """
         Filters out the top given percentage of high frequencies from the signal.
@@ -369,6 +351,6 @@ class SignalProcessor:
         cutoff_index = int(n * (1 - percentage) / 2)
         filtered_fourier_transforms = self.fourier_transforms.clone()
         filtered_fourier_transforms[..., cutoff_index:-cutoff_index] = 0
-        
+
         filtered_signals = torch.fft.ifft(filtered_fourier_transforms, dim=-1)
         return filtered_signals.real

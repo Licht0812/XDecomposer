@@ -4,7 +4,6 @@ import os
 import sys
 import pymatgen as mg
 
-
 if __name__ == '__main__':
 
     max_texture = 0.5 # default: texture associated with up to +/- 50% changes in peak intensities

@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 
-
 """
 ***** Function norm_1 *****
 Normalize the 1D-signal XRD pattern to obtain a maximum = 1.
@@ -35,8 +34,6 @@ def write(new_path,old_path,file_name,data):
         fichier.write(j)
     for i in range(len(data)):
         fichier.write(str(data[i]) + '\n')
-    
-    
 
 old_path = """ TO DO """
 new_path = """ TO DO """

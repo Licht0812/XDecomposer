@@ -16,7 +16,6 @@ from model.dataset import ASEDataset
 from model.XQueryer import Xmodel
 import random
 
-# 新增：导入pymatgen相关（兼容缺失情况）
 warnings.filterwarnings("ignore")
 try:
     from pymatgen.core import Structure
@@ -25,9 +24,8 @@ try:
 except ImportError:
     xrd_calc = None
 
-# ===================== 新增：风格配置 & 辅助函数 =====================
 def setup_plot_style():
-    """设置NIPS风格的绘图参数（和目标代码一致）"""
+    """Set plot defaults."""
     plt.rcParams.update({
         'font.family': 'serif',
         'font.serif': ['Times New Roman'],
@@ -40,41 +38,40 @@ def setup_plot_style():
     })
 
 def format_chem(chem):
-    """简化化学式格式化（和目标代码一致）"""
-    if isinstance(chem, (int, float)): 
+    """Format a chemical formula."""
+    if isinstance(chem, (int, float)):
         chem = str(chem)
-    # 清理名称 + 格式化下标
+    # Clean the name and add subscripts
     clean_name = str(chem).replace(".cif", "").split('_')[0].replace("_", "\\_")
     return "$\mathrm{" + re.sub(r'(\d+)', r'_{\1}', clean_name) + "}$"
 
-def get_cif_path(mpid, cif_base_dir="/data/group/project1/Crystal/UniqCry/cif_files"):
-    """辅助函数：根据mpid获取cif文件路径（需根据实际路径调整）"""
+def get_cif_path(mpid, cif_base_dir="data/cif_files"):
+    """Return the CIF path for an mpid."""
     if not mpid or mpid == "Unknown":
         return None
     cif_path = os.path.join(cif_base_dir, f"{mpid}.cif")
     return cif_path if os.path.exists(cif_path) else None
 
 def get_name_mapping():
-    mapping_path = "/data/home/zdhs0019/Projects/xrd_baselines/XRD-AutoAnalyzer/id_to_ref_mapping_full.pkl"
+    mapping_path = "data/id_to_ref_mapping_full.pkl"
     if os.path.exists(mapping_path):
         with open(mapping_path, 'rb') as f:
             return pickle.load(f)
     return {}
 
-# ===================== 核心可视化函数（修改后） =====================
-def visualize(model, dataset, device, entries_dict, save_dir='plots', 
-              db_path='/data/group/project1/Crystal/UniqCryLabeled.db',
-              cif_base_dir="/data/group/project1/Crystal/UniqCry/cif_files"):
+def visualize(model, dataset, device, entries_dict, save_dir='plots',
+              db_path='data/UniqCryLabeled.db',
+              cif_base_dir="data/cif_files"):
     os.makedirs(save_dir, exist_ok=True)
-    setup_plot_style()  # 应用新的绘图风格
+    setup_plot_style()
     model.eval()
-    
+
     name_mapping = get_name_mapping()
-    
+
     # Target number of phases to find
     target_phases = [2, 3, 4]
     found_samples = {} # Dictionary to store {num_phases: (index, batch_data)}
-    
+
     print("Searching for samples with 2, 3, and 4 phases...")
     # Search through dataset to find one of each
     search_limit = 2000
@@ -86,16 +83,16 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
             print(f"  Found {num_phases}-phase sample at index {i}")
         if len(found_samples) == len(target_phases):
             break
-            
-    two_theta = np.linspace(8, 82, 3500)  # 调整x范围（和目标代码一致：8-82）
+
+    two_theta = np.linspace(8, 82, 3500)
 
     for n_phase in target_phases:
         if n_phase not in found_samples:
             print(f"Warning: Could not find a sample with {n_phase} phases.")
             continue
-            
+
         sample_idx, batch = found_samples[n_phase]
-        
+
         # Prepare input
         intensity = batch['intensity'].unsqueeze(0).to(device)
         element = batch['element'].unsqueeze(0).to(device)
@@ -108,16 +105,16 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
             pred_xrds = outputs['xrds'][0].cpu() # num_slots, 3500
             pred_ratios = outputs['ratios'][0].cpu() # num_slots
             feat_logits = outputs['feat_logits'][0].cpu() # num_slots, num_classes
-            
+
         # Hungarian Matching for visualization alignment
         valid_gt_mask = gt_ratios > 1e-6
         num_valid_gt = valid_gt_mask.sum().item()
-        
+
         # Convert to float32 for cdist
         cost_matrix = torch.cdist(pred_xrds.float(), gt_xrds[valid_gt_mask].float(), p=2).numpy()
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
         matched_slots = set(row_ind)
-            
+
         # Prepare slot data for sorting
         num_slots = pred_xrds.shape[0]
         slot_data = []
@@ -131,7 +128,7 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
             retrieved_id = torch.argmax(cos_sim).item()
             max_sim = cos_sim[retrieved_id].item()
             retrieved_mpid = entries_dict.get(str(retrieved_id), {}).get("mpid", "Unknown")
-            
+
             gt_info = None
             if slot_idx in matched_slots:
                 match_pos = list(row_ind).index(slot_idx)
@@ -145,9 +142,9 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
                     'id': int(g_id),
                     'mpid': gt_mpid,
                     'xrd': gt_xrds[gt_idx].numpy(),
-                    'cif_path': get_cif_path(gt_mpid, cif_base_dir)  # 新增：获取cif路径
+                    'cif_path': get_cif_path(gt_mpid, cif_base_dir)
                 }
-            
+
             slot_data.append({
                 'slot_idx': slot_idx,
                 'p_ratio': p_ratio,
@@ -156,117 +153,99 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
                 'p_sim': max_sim,
                 'p_xrd': pred_xrds[slot_idx].numpy(),
                 'gt': gt_info,
-                'cif_path': get_cif_path(retrieved_mpid, cif_base_dir)  # 新增：预测相的cif路径
+                'cif_path': get_cif_path(retrieved_mpid, cif_base_dir)
             })
-            
+
         # Sort by GT ratio if available, otherwise by predicted ratio
         slot_data.sort(key=lambda x: x['gt']['ratio'] if x['gt'] else -1, reverse=True)
-        
+
         # Calculate reconstructed mixture and residual
         reconstructed_y = np.zeros(3500)
         for data in slot_data:
             reconstructed_y += data['p_ratio'] * data['p_xrd']
-        
+
         mixed_input_np = batch['intensity'].numpy()
-        
-        # 归一化（和目标代码一致：用mix的max值）
+
         max_val = np.max(mixed_input_np) if np.max(mixed_input_np) > 0 else 1.0
         mixed_input_norm = mixed_input_np / max_val
         reconstructed_norm = reconstructed_y / max_val
         residual_norm = mixed_input_norm - reconstructed_norm
 
-        # ===================== 绘图部分（完全重构） =====================
-        # 新布局：左侧=混合+残差（2行1列），右侧=分量（K行1列），宽度比1.25:1.0
-        fig = plt.figure(figsize=(16.0, 8.0))  # 和目标代码一致的画布尺寸
+        fig = plt.figure(figsize=(16.0, 8.0))
         rows = num_slots
         gs = gridspec.GridSpec(rows + 1, 2, width_ratios=[1.25, 1.0], wspace=0.10, hspace=0.12)
-        
-        # 左侧子网格（混合+残差）
-        gs_left = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs[:, 0], height_ratios=[rows, 1], hspace=0.0)
-        ax_mix = fig.add_subplot(gs_left[0, 0])     
-        ax_res = fig.add_subplot(gs_left[1, 0], sharex=ax_mix) 
 
-        # --- 1. 混合图（左侧上） ---
-        # 配色：GT=灰色#7F7F7F，重构=正红#D62728（和目标代码一致）
+        gs_left = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs[:, 0], height_ratios=[rows, 1], hspace=0.0)
+        ax_mix = fig.add_subplot(gs_left[0, 0])
+        ax_res = fig.add_subplot(gs_left[1, 0], sharex=ax_mix)
+
         ax_mix.plot(two_theta, mixed_input_norm, color='#7F7F7F', lw=2.5, alpha=0.7, label='Ground Truth', zorder=2)
         ax_mix.plot(two_theta, reconstructed_norm, color='#D62728', lw=1.5, label='Reconstructed', zorder=3)
-        
-        # 左侧垂直Intensity标签（和目标代码一致）
+
         fig.text(0.06, 0.5, "Intensity (a.u.)", va='center', ha='center', rotation='vertical', fontsize=15)
-        
+
         ax_mix.legend(loc="upper right", frameon=True, edgecolor='black').get_frame().set_linewidth(0.5)
         ax_mix.set_title("Overall Mixture and Residual", fontsize=16)
-        
-        # 坐标轴样式（和目标代码一致）
-        ax_mix.set(xlim=(8, 82), xticks=[10, 20, 30, 40, 50, 60, 70, 80], 
+
+        ax_mix.set(xlim=(8, 82), xticks=[10, 20, 30, 40, 50, 60, 70, 80],
                    ylim=(-0.02, 1.1), yticks=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
         ax_mix.tick_params(axis='both', direction='in', top=False, right=False, labelbottom=False)
-        for spine in ax_mix.spines.values(): 
+        for spine in ax_mix.spines.values():
             spine.set(linewidth=1.0, color='black')
 
-        # --- 2. 残差图（左侧下） ---
         ax_res.plot(two_theta, residual_norm, color='#7F7F7F', lw=1)
         ax_res.axhline(0, color='black', lw=0.8, ls='--')
         ax_res.set_xlabel(r"$2\theta\ (^\circ)$", fontsize=15)
         ax_res.set_xticks([10, 20, 30, 40, 50, 60, 70, 80])
         ax_res.tick_params(axis='both', direction='in', top=False, right=False)
-        for spine in ax_res.spines.values(): 
+        for spine in ax_res.spines.values():
             spine.set(linewidth=1.0, color='black')
-        
-        # 残差ylim计算（和目标代码一致）
+
         res_max = max(np.abs(residual_norm).max(), 0.05) if np.abs(residual_norm).max() != 0 else 0.05
         ax_res.set(ylim=(-res_max*1.2, res_max*1.2), yticks=[-res_max, 0, res_max])
         ax_res.set_yticklabels([f"{-res_max:.2f}", "0", f"{res_max:.2f}"])
 
-        # --- 3. 分量图（右侧） ---
-        # 目标代码的配色方案
         colors_pred_palette = ['#1F77B4', '#2CA02C', '#9467BD', '#8C564B', '#17BECF']
         gs_mid = gridspec.GridSpecFromSubplotSpec(num_slots, 1, subplot_spec=gs[:, 1], hspace=0.10)
         comp_axes = []
-        
-        # 分量绘制辅助函数
+
         def plot_component(ax, slot_data, color_pred, is_last):
-            # 提取数据
+
             gt_scaled = (slot_data['gt']['ratio'] * slot_data['gt']['xrd']) / max_val if slot_data['gt'] else np.zeros(3500)
             pred_scaled = (slot_data['p_ratio'] * slot_data['p_xrd']) / max_val
             gt_w = slot_data['gt']['ratio'] if slot_data['gt'] else 0
             pred_w = slot_data['p_ratio']
-            
-            # 绘制理论XRD峰（和目标代码一致）
+
             cif_path = slot_data['gt']['cif_path'] if (slot_data['gt'] and slot_data['gt']['cif_path']) else slot_data['cif_path']
             if xrd_calc is not None and cif_path and os.path.exists(cif_path):
                 try:
                     struct = Structure.from_file(cif_path)
                     pat = xrd_calc.get_pattern(struct, two_theta_range=(8, 82))
                     max_h = max(gt_scaled.max(), pred_scaled.max())
-                    ax.vlines(pat.x, 0, (pat.y/100.0)*max_h, 
+                    ax.vlines(pat.x, 0, (pat.y/100.0)*max_h,
                               color='#FF7F0E', lw=1.5, label='Theory', alpha=0.8, zorder=1)
                 except Exception as e:
                     pass
-            
-            # 绘制GT和预测曲线（+0.05偏移，和目标代码一致）
+
             if slot_data['gt']:
-                ax.plot(two_theta, gt_scaled + 0.05, color='#7F7F7F', lw=1.5, 
+                ax.plot(two_theta, gt_scaled + 0.05, color='#7F7F7F', lw=1.5,
                         label=f'GT Content: {gt_w*100:.1f}%', zorder=2)
-            ax.plot(two_theta, pred_scaled + 0.05, color=color_pred, lw=1.5, ls='--', 
+            ax.plot(two_theta, pred_scaled + 0.05, color=color_pred, lw=1.5, ls='--',
                     label=f'Pred Content: {pred_w*100:.1f}%', zorder=3)
-            
-            # 化学式标题（和目标代码一致）
+
             gt_name = format_chem(name_mapping.get(slot_data['gt']['id'], "Unknown")) if slot_data['gt'] else "None"
             pred_name = format_chem(name_mapping.get(slot_data['p_id'], "Unknown"))
             title = f"GT: {gt_name}\nPred: {pred_name}"
-            ax.text(0.02, 0.95, title, transform=ax.transAxes, 
+            ax.text(0.02, 0.95, title, transform=ax.transAxes,
                     fontsize=11, va='top', ha='left', linespacing=1.2)
-            
-            # 坐标轴样式
-            ax.set(xlim=(8, 82), xticks=[10, 20, 30, 40, 50, 60, 70, 80], 
+
+            ax.set(xlim=(8, 82), xticks=[10, 20, 30, 40, 50, 60, 70, 80],
                    ylim=(-0.05, 1.15), yticks=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
-            for spine in ax.spines.values(): 
+            for spine in ax.spines.values():
                 spine.set(visible=True, linewidth=1.0, color='black')
-            
+
             ax.legend(loc='upper right', frameon=False, fontsize=10)
 
-            # Tick样式
             if not is_last:
                 ax.tick_params(axis='y', left=True, right=False, labelleft=True, labelright=False, direction='in')
                 ax.tick_params(axis='x', direction='in', top=False, labelbottom=False)
@@ -275,16 +254,14 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
                 ax.set_xlabel(r"$2\theta\ (^\circ)$", fontsize=15)
                 ax.tick_params(axis='x', direction='in', top=False)
 
-        # 遍历所有分量绘制
         for i in range(num_slots):
             ax_c = fig.add_subplot(gs_mid[i, 0], sharex=(comp_axes[0] if i > 0 else None))
             is_last = (i == num_slots - 1)
             plot_component(ax_c, slot_data[i], colors_pred_palette[i % len(colors_pred_palette)], is_last)
             comp_axes.append(ax_c)
 
-        # --- 4. 最终布局调整 & 保存 ---
         plt.subplots_adjust(left=0.09, right=0.92, top=0.94, bottom=0.10, wspace=0.10)
-        # 保存为PDF（和目标代码一致），dpi=600
+
         save_path = os.path.join(save_dir, f'vis_{n_phase}phase_sample.pdf')
         plt.savefig(save_path, format='pdf', bbox_inches='tight', dpi=600)
         print(f'Saved visualization to {save_path}')
@@ -293,18 +270,18 @@ def visualize(model, dataset, device, entries_dict, save_dir='plots',
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--load_path', default='/data/home/zdhs0019/Projects/xrd_baselines/XQueryer/output/2026-03-24_1725/checkpoints/checkpoint_0010.pth', type=str)
-    parser.add_argument('--db_path', default='/data/group/project1/Crystal/UniqCryLabeled.db', type=str)
-    parser.add_argument('--npz_dir', default='/data/group/project1/Crystal/UniqCry', type=str)
+    parser.add_argument('--load_path', default='checkpoints/xqueryer/latest.pth', type=str)
+    parser.add_argument('--db_path', default='data/UniqCryLabeled.db', type=str)
+    parser.add_argument('--npz_dir', default='data/UniqCry', type=str)
     parser.add_argument('--entries_dict', default='./src/entries_dict.json', type=str)
     parser.add_argument('--num_slots', default=4, type=int)
     parser.add_argument('--feature_dim', default=256, type=int)
     parser.add_argument('--num_classes', default=100315, type=int)
-    parser.add_argument('--cif_base_dir', default="/data/group/project1/Crystal/UniqCry/cif_files", type=str)  # 新增：cif文件目录
+    parser.add_argument('--cif_base_dir', default="data/cif_files", type=str)
     args = parser.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     # Load entries dictionary
     with open(args.entries_dict, 'r') as f:
         entries_dict = json.load(f)
@@ -314,8 +291,8 @@ if __name__ == '__main__':
     checkpoint = torch.load(args.load_path, map_location=device)
     model.load_state_dict(checkpoint['model'])
     model.to(device)
-    
+
     # Use ASEDataset - note that it returns random mixtures on each call
     testset = ASEDataset(args.db_path, args.npz_dir, mode='test', encode_element=True, num_classes=args.num_classes)
-    
+
     visualize(model, testset, device, entries_dict, cif_base_dir=args.cif_base_dir)

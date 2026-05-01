@@ -20,14 +20,14 @@ def get_structure_from_db(db_path, cid):
         return structure
     return None
 
-db_path = '/data/group/project1/Crystal/UniqCryLabeled.db'
+db_path = 'data/UniqCryLabeled.db'
 cid = 1
 struc = get_structure_from_db(db_path, cid)
 formula = struc.composition.reduced_formula
 print(f"ID {cid} Formula: {formula}")
 
 # Load NPZ spectrum
-npz_path = '/data/group/project1/Crystal/UniqCry/mp20-xrd_data/data/crystal_1_sample_00.npz'
+npz_path = 'data/mp20-xrd_data/data/crystal_1_sample_00.npz'
 data = np.load(npz_path)
 x_npz = data['x']
 y_npz = data['y']

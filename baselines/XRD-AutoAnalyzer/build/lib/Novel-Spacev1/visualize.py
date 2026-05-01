@@ -4,7 +4,6 @@ import numpy as np
 import pymatgen as mg
 import matplotlib.pyplot as plt
 
-
 if __name__ == '__main__':
 
     wavelength = 'CuKa'

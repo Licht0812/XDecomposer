@@ -21,26 +21,22 @@ class Xmodel(nn.Module):
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, embed_dim, dim_feedforward))
 
-
-        # -------------encoder----------------
         sa_layer = CrossAttnLayer(embed_dim, nhead, dim_feedforward, dropout, activation)
         self.encoder = SelfAttnModule(sa_layer, num_encoder_layers,)
-        # ------------------------------------
 
         self.norm_after = nn.LayerNorm(embed_dim)
 
         self.cls_head = nn.Sequential(
-            nn.Linear(embed_dim, 2048), 
+            nn.Linear(embed_dim, 2048),
             nn.BatchNorm1d(2048),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
-            nn.Linear(2048, 1024), 
+            nn.Linear(2048, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
-            nn.Linear(1024, num_classes) 
+            nn.Linear(1024, num_classes)
         )
-
 
         self._reset_parameters()
         self.init_weights()
@@ -77,7 +73,7 @@ class Xmodel(nn.Module):
         # normalize to 0-1
         x = x / 100
         x = x.unsqueeze(1) # N*1*3500
-        
+
         x1 = self.conv(x) # N*192*3500
         x2 = self.conv(SignalProcessor(x,sampling_rate).filter_high_frequencies(percentage=0.3)) # N*192*3500
         x3 = self.conv(SignalProcessor(x,sampling_rate).filter_high_frequencies(percentage=0.6)) # N*192*3500
@@ -95,20 +91,17 @@ class Xmodel(nn.Module):
         print(x.shape)
         """
 
-
-        pos_embed = self.pos_embed.permute(2, 0, 1).contiguous().repeat(1, N, 1) 
-       
+        pos_embed = self.pos_embed.permute(2, 0, 1).contiguous().repeat(1, N, 1)
 
         elem = elem.unsqueeze(1) # N*1*92
         elem = elem.permute(1, 0, 2).contiguous() # 1*N*92
 
         feats = self.encoder(x, pos_embed,elem)
         feats = self.norm_after(feats)
-        
-        logits = self.cls_head(feats[0])
-     
-        return logits
 
+        logits = self.cls_head(feats[0])
+
+        return logits
 
 class ConvModule(nn.Module):
     def __init__(self, drop_rate=0.):
@@ -170,8 +163,6 @@ class ConvModule(nn.Module):
         x6 = self.bn6(x6)
         x6 = self.act6(x6)
 
-
-
         #x = self.maxpool(x)
 
         #x = self.layer1(x)
@@ -180,7 +171,6 @@ class ConvModule(nn.Module):
         #x = self.maxpool2(x)
         return torch.cat((x1, x2, x3, x4, x5, x6), dim=1)
 
-
 class SelfAttnModule(nn.Module):
 
     def __init__(self, encoder_layer, num_layers, norm=None):
@@ -188,7 +178,6 @@ class SelfAttnModule(nn.Module):
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
         self.norm = norm
-   
 
     def forward(self, src, pos,elem):
         output = src
@@ -201,15 +190,14 @@ class SelfAttnModule(nn.Module):
 
         return output
 
-
 class CrossAttnLayer(nn.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
         super().__init__()
         # Define element_map
-        self.element_map = nn.Sequential(  
-            nn.Linear(92, 768 * 3500),   
-            nn.Dropout(0.5),  
+        self.element_map = nn.Sequential(
+            nn.Linear(92, 768 * 3500),
+            nn.Dropout(0.5),
             nn.ReLU(),
         )
 
@@ -237,8 +225,6 @@ class CrossAttnLayer(nn.Module):
         src = self.norm2(src)
         return src
 
-
-
 class Layer(nn.Module):
     def __init__(self, inchannel, outchannel, kernel_size, stride, downsample):
         super(Layer, self).__init__()
@@ -249,7 +235,6 @@ class Layer(nn.Module):
         x = self.block1(x)
         x = self.block2(x)
         return x
-
 
 class BasicBlock(nn.Module):
     def __init__(self, inchannel, outchannel, kernel_size, stride, downsample=False):
@@ -277,10 +262,8 @@ class BasicBlock(nn.Module):
         x = self.act2(x)
         return x
 
-
 def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
-
 
 def _get_activation_fn(activation):
     """Return an activation function given a string"""
@@ -292,10 +275,8 @@ def _get_activation_fn(activation):
         return F.glu
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
-
 def with_pos_embed(tensor, pos):
     return tensor if pos is None else tensor + pos
-
 
 def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     """
@@ -317,8 +298,6 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
     emb = np.concatenate([emb_sin, emb_cos], axis=1)  # (M, D)
     return emb
 
-
-
 class SignalProcessor:
     def __init__(self, signals, sampling_rate):
         """
@@ -332,7 +311,7 @@ class SignalProcessor:
         self.sampling_rate = sampling_rate
         self.frequency = torch.fft.fftfreq(signals.shape[-1], d=1/sampling_rate)
         self.fourier_transforms = torch.fft.fft(signals, dim=-1)
-    
+
     def filter_high_frequencies(self, percentage=0.2):
         """
         Filters out the top given percentage of high frequencies from the signal.
@@ -347,6 +326,6 @@ class SignalProcessor:
         cutoff_index = int(n * (1 - percentage) / 2)
         filtered_fourier_transforms = self.fourier_transforms.clone()
         filtered_fourier_transforms[..., cutoff_index:-cutoff_index] = 0
-        
+
         filtered_signals = torch.fft.ifft(filtered_fourier_transforms, dim=-1)
         return filtered_signals.real

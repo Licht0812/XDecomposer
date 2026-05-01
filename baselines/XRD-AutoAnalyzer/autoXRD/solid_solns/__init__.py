@@ -12,7 +12,6 @@ import multiprocessing
 from multiprocessing import Pool, Manager
 from pymatgen.core import Structure
 
-
 class SolidSolnsGen(object):
     """
     Class used to generate hypothetical solid solutions by interpolating
@@ -54,7 +53,6 @@ class SolidSolnsGen(object):
             matching_pairs = pool.map(self.are_soluble, all_pairs)
             matching_pairs = [pair for pair in matching_pairs if pair != None]
             return matching_pairs
-
 
     def are_soluble(self, pair):
         """
@@ -236,8 +234,6 @@ class SolidSolnsGen(object):
 
         return all_solid_solns
 
-
-
 def main(reference_directory):
 
     ns_generator = SolidSolnsGen(reference_directory)
@@ -253,5 +249,4 @@ def main(reference_directory):
         # Do not write if a known stoichiometric reference phase already exists
         if filepath.split('/')[1] not in os.listdir(reference_directory):
             struc.to(filename=filepath, fmt='cif')
-
 

@@ -1,25 +1,25 @@
 #!/bin/bash
 #SBATCH --job-name=xrd_train
-#SBATCH --partition=project1
+#SBATCH --partition=your-partition
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=256G
-#SBATCH --gres=gpu:1             # 申请单卡 GPU
+#SBATCH --gres=gpu:1
 
-# 环境加载
+# Load the environment
 module load miniconda
 source activate xrd
 
-# 设置 Python 路径
+# Set PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:$(pwd)
 
-# 执行训练脚本
-# -u 参数确保输出实时刷新到日志文件
-# 启用了 Peak Shift 增强后，建议至少训练 100-200 个 Epoch
+# Run training
+# Keep logs unbuffered
+# Peak shift usually needs longer training
 python -u src/train.py \
-    --db_path /data/group/project1/Crystal/UniqCryLabeled.db \
-    --npz_dir /data/group/project1/Crystal/UniqCry \
+    --db_path data/UniqCryLabeled.db \
+    --npz_dir data/UniqCry \
     --batch_size 32 \
     --epochs 200 \
     --lr 8e-5 \
