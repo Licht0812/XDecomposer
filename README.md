@@ -36,11 +36,11 @@ The framework integrates:
 
 ## Pre-trained Models & Dataset
 
-Pretrained checkpoints and the RRUFF dataset are available via Google Drive.
+Pretrained checkpoints and the RRUFF dataset are available through an anonymized OSF view-only link.
 
 Please download and extract them into your local **XDecomposer/** directory.
 
-**Google Drive Download** [Link](https://drive.google.com/drive/folders/1bdgzdtouRn7TObqmvMgNLdA5PGPx0dVt?usp=sharing)
+**Anonymous OSF Download:** [Link](https://osf.io/zkunc/overview?view_only=cfd48c9fcec24983905f134bbf560392)
 
 ---
 
