@@ -40,7 +40,7 @@ Pretrained checkpoints and the RRUFF dataset are available through an anonymized
 
 Please download and extract them into your local **XDecomposer/** directory.
 
-**Anonymous OSF Download:** [Link](https://osf.io/zkunc/overview?view_only=cfd48c9fcec24983905f134bbf560392)
+**OSF Download:** [Link](https://osf.io/zkunc/overview?view_only=cfd48c9fcec24983905f134bbf560392)
 
 ---
 
