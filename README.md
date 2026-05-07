@@ -36,12 +36,7 @@ The framework integrates:
 
 ## Pre-trained Models & Dataset
 
-Pretrained checkpoints and the RRUFF dataset are available through an anonymized OSF view-only link.
-
 Please download and extract them into your local **XDecomposer/** directory.
-
-**OSF Download:** [Link](https://osf.io/zkunc/overview?view_only=cfd48c9fcec24983905f134bbf560392)
-
 ---
 
 ## Installation
