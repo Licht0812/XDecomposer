@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/Licht0812/XDecomposer/stargazers">
-    <img src="https://img.shields.io/github/stars/Licht0812/XDecomposer?style=social" alt="GitHub Stars">
+    <img src="https://img.shields.io/github/stars/Licht0812/XDecomposer">
   </a>
   <a href="https://github.com/Licht0812/XDecomposer/network/members">
     <img src="https://img.shields.io/github/forks/Licht0812/XDecomposer?style=social" alt="GitHub Forks">
