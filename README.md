@@ -25,7 +25,7 @@
 
 > [!IMPORTANT]
 > **XDecomposer is the first deep learning framework for true whole-pattern multiphase XRD decomposition.**  
-> Instead of performing conventional search-match or iterative peak subtraction, XDecomposer directly decomposes a mixed diffraction pattern into phase-wise components through query-based blind source separation and physics-consistent reconstruction. This work marks a major shift for AI-driven XRD analysis, moving the field from 
+> Instead of performing conventional search-match or iterative peak subtraction, XDecomposer directly decomposes a mixed diffraction pattern into phase-wise components through query-based blind source separation and physics-consistent reconstruction. This work marks a major shift for AI-driven XRD analysis, moving the field from phase recognition toward genuine diffraction understanding and structure-level decomposition.
 
 ---
 
