@@ -3,17 +3,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/your-org/XDecomposer/stargazers">
-    <img src="https://img.shields.io/github/stars/your-org/XDecomposer?style=social" alt="GitHub Stars">
+  <a href="https://github.com/Licht0812/XDecomposer/stargazers">
+    <img src="https://img.shields.io/github/stars/Licht0812/XDecomposer?style=social" alt="GitHub Stars">
   </a>
   <a href="https://github.com/your-org/XDecomposer/network/members">
-    <img src="https://img.shields.io/github/forks/your-org/XDecomposer?style=social" alt="GitHub Forks">
+    <img src="https://img.shields.io/github/forks/Licht0812/XDecomposer?style=social" alt="GitHub Forks">
   </a>
   <a href="https://github.com/your-org/XDecomposer/issues">
-    <img src="https://img.shields.io/github/issues/your-org/XDecomposer" alt="Issues">
+    <img src="https://img.shields.io/github/issues/Licht0812/XDecomposer" alt="Issues">
   </a>
   <a href="https://github.com/your-org/XDecomposer/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/your-org/XDecomposer" alt="License">
+    <img src="https://img.shields.io/github/license/Licht0812/XDecomposer" alt="License">
   </a>
   <a href="https://arxiv.org/abs/2605.05866">
     <img src="https://img.shields.io/badge/arXiv-2605.05866-b31b1b.svg" alt="arXiv">
