@@ -6,13 +6,13 @@
   <a href="https://github.com/Licht0812/XDecomposer/stargazers">
     <img src="https://img.shields.io/github/stars/Licht0812/XDecomposer?style=social" alt="GitHub Stars">
   </a>
-  <a href="https://github.com/your-org/XDecomposer/network/members">
+  <a href="https://github.com/Licht0812/XDecomposer/network/members">
     <img src="https://img.shields.io/github/forks/Licht0812/XDecomposer?style=social" alt="GitHub Forks">
   </a>
-  <a href="https://github.com/your-org/XDecomposer/issues">
+  <a href="https://github.com/Licht0812/XDecomposer/issues">
     <img src="https://img.shields.io/github/issues/Licht0812/XDecomposer" alt="Issues">
   </a>
-  <a href="https://github.com/your-org/XDecomposer/blob/main/LICENSE">
+  <a href="https://github.com/Licht0812/XDecomposer/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/Licht0812/XDecomposer" alt="License">
   </a>
   <a href="https://arxiv.org/abs/2605.05866">
