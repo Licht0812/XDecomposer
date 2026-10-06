@@ -18,12 +18,9 @@
   <a href="https://arxiv.org/abs/2605.05866">
     <img src="https://img.shields.io/badge/arXiv-2605.05866-b31b1b.svg" alt="arXiv">
   </a>
-  <img src="https://img.shields.io/badge/NeurIPS%202026-Accepted-brightgreen.svg" alt="NeurIPS 2026">
 </p>
 
-<p align="center">
-  <b>Accepted to NeurIPS 2026</b>
-</p>
+🎉 **News:** *XDecomposer: Learning Prior-Free Set Decomposition for Multiphase X-ray Diffraction* has been accepted to **NeurIPS 2026**!
 
 > [!IMPORTANT]
 > **XDecomposer is the first deep learning framework for true whole-pattern multiphase XRD decomposition.**  
