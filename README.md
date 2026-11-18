@@ -161,13 +161,12 @@ XDecomposer/
 If you use **XDecomposer** in your research, please cite:
 
 ```bibtex
-@misc{gao2026xdecomposerlearningpriorfreeset,
-      title={XDecomposer: Learning Prior-Free Set Decomposition for Multiphase X-ray Diffraction}, 
-      author={Hanyu Gao and Bin Cao and Yunyue Su and Tong-Yi Zhang and Qiang Liu},
-      year={2026},
-      eprint={2605.05866},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI},
-      url={https://arxiv.org/abs/2605.05866}, 
+@inproceedings{
+gao2026xdecomposer,
+title={{XD}ecomposer: Learning Prior-Free Set Decomposition for Multiphase X-ray Diffraction},
+author={Hanyu Gao and Bin Cao and Yunyue Su and Tong-yi Zhang and Qiang Liu},
+booktitle={The Fortieth Annual Conference on Neural Information Processing Systems},
+year={2026},
+url={https://openreview.net/forum?id=2Q4B95mpTf}
 }
 ```
